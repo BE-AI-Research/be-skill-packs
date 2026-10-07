@@ -1,0 +1,17 @@
+#include "{{NAME}}.h"
+
+U{{NAME}}::U{{NAME}}()
+{
+	// Turn off if this component does not need to tick.
+	PrimaryComponentTick.bCanEverTick = true;
+}
+
+void U{{NAME}}::BeginPlay()
+{
+	Super::BeginPlay();
+}
+
+void U{{NAME}}::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+}

@@ -1,0 +1,38 @@
+[
+  {
+    "id": "ue5-001-typo",
+    "prompt": "The build is failing. Fix it.",
+    "setup": "In Source/Fixture/FixtureCharacter.cpp, rename one use of the member Health to Healthh.",
+    "check": ["build passes", "no other lines changed in FixtureCharacter.cpp"]
+  },
+  {
+    "id": "ue5-002-generated-order",
+    "prompt": "The build is failing. Fix it.",
+    "setup": "In Source/Fixture/FixturePickup.h, move #include \"FixturePickup.generated.h\" above #include \"GameFramework/Actor.h\".",
+    "check": ["build passes", "the .generated.h include is the last include in FixturePickup.h"]
+  },
+  {
+    "id": "ue5-003-module-dep",
+    "prompt": "Bind a jump input in AFixtureCharacter using Enhanced Input. Add UPROPERTYs for the input action and mapping context.",
+    "setup": "Remove EnhancedInput from Fixture.Build.cs.",
+    "check": ["build passes", "EnhancedInput present in Fixture.Build.cs", "UInputAction and UInputMappingContext members are TObjectPtr UPROPERTYs", "binding uses UEnhancedInputComponent::BindAction"]
+  },
+  {
+    "id": "ue5-004-replicated-health",
+    "prompt": "Make Health on AFixtureCharacter replicate to clients, with an OnRep function that logs the new value.",
+    "setup": "Health is a plain UPROPERTY(EditAnywhere) float.",
+    "check": ["build passes", "UPROPERTY uses ReplicatedUsing=OnRep_Health", "GetLifetimeReplicatedProps defined, calls Super, uses DOREPLIFETIME", "Net/UnrealNetwork.h included in the .cpp", "OnRep_Health is a UFUNCTION"]
+  },
+  {
+    "id": "ue5-005-native-event",
+    "prompt": "Add a BlueprintNativeEvent OnPickedUp(AActor* By) to AFixturePickup with a C++ default that destroys the pickup.",
+    "setup": "None.",
+    "check": ["build passes", "UFUNCTION(BlueprintNativeEvent...) declared", "body defined as OnPickedUp_Implementation", "no definition of plain OnPickedUp"]
+  },
+  {
+    "id": "ue5-006-component",
+    "prompt": "Create a UFixtureStaminaComponent with Stamina and MaxStamina, a BlueprintCallable TryConsume(float Amount) that returns bool, and regen in TickComponent. Add it to AFixtureCharacter.",
+    "setup": "None.",
+    "check": ["build passes", "class has FIXTURE_API and GENERATED_BODY", "component created with CreateDefaultSubobject in the character constructor", "member is a TObjectPtr UPROPERTY", "TryConsume is BlueprintCallable with a Category"]
+  }
+]

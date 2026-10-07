@@ -1,0 +1,19 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "{{BASE_INCLUDE}}"
+#include "{{NAME}}.generated.h"
+
+UCLASS()
+class {{MODULE_API}} A{{NAME}} : public {{BASE}}
+{
+	GENERATED_BODY()
+
+public:
+	A{{NAME}}();
+
+	virtual void Tick(float DeltaSeconds) override;
+
+protected:
+	virtual void BeginPlay() override;
+};

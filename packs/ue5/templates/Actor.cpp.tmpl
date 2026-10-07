@@ -1,0 +1,17 @@
+#include "{{NAME}}.h"
+
+A{{NAME}}::A{{NAME}}()
+{
+	// Turn off if this actor does not need to tick; it is cheaper.
+	PrimaryActorTick.bCanEverTick = true;
+}
+
+void A{{NAME}}::BeginPlay()
+{
+	Super::BeginPlay();
+}
+
+void A{{NAME}}::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+}

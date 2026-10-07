@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "name": "ue5",
+  "version": "0.1.0",
+  "description": "Unreal Engine 5 C++ and build expertise",
+  "detect": { "any": ["*.uproject"] },
+  "core": { "file": "core.md", "budget_tokens": 1500 },
+  "chunks": {
+    "cpp-reflection": {
+      "file": "chunks/cpp-reflection.md",
+      "summary": "UCLASS/USTRUCT/UENUM/UPROPERTY/UFUNCTION, UHT rules, garbage collection and object lifetime",
+      "triggers": ["UCLASS", "USTRUCT", "UENUM", "UPROPERTY", "UFUNCTION", "GENERATED_BODY", "TObjectPtr", "NewObject", "CreateDefaultSubobject"]
+    },
+    "build-system": {
+      "file": "chunks/build-system.md",
+      "summary": ".uproject, .Build.cs, .Target.cs, modules, plugins, module API macros, building and Live Coding",
+      "triggers": [".Build.cs", ".Target.cs", ".uproject", ".uplugin", "ModuleRules", "TargetRules", "DependencyModuleNames", "_API"]
+    }
+  },
+  "verify": [
+    {
+      "name": "build",
+      "cmd": ["{pack}/tools/ue-build", "--project", "{workspace}"],
+      "cmd_windows": ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "{pack}/tools/ue-build.ps1", "-Project", "{workspace}"],
+      "parser": "ubt",
+      "timeout": "30m",
+      "when": { "changed": ["Source/**", "Plugins/**/Source/**", "*.uproject", "Plugins/**/*.uplugin"] }
+    }
+  ],
+  "playbooks": ["playbooks/errors.md"],
+  "commands": "commands",
+  "mcp_servers": {
+    "ue-editor": { "command": "be-ue5-editor", "args": ["--serve"], "optional": true }
+  },
+  "requires": { "be_code": ">=1.3.0" }
+}

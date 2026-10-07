@@ -1,0 +1,99 @@
+#!/bin/sh
+# ue-build — build an Unreal Engine project with UnrealBuildTool (Linux/macOS).
+# Used as the ue5 pack's verify command; output is parsed by BE-Code's "ubt" parser.
+set -eu
+
+usage() {
+	cat <<'USAGE'
+usage: ue-build [--project DIR|FILE.uproject] [--target NAME] [--config CONFIG]
+                [--engine DIR] [--dry-run]
+
+  --project  project directory or .uproject file (default: current directory)
+  --target   build target (default: <Project>Editor)
+  --config   Debug | DebugGame | Development | Shipping (default: Development)
+  --engine   engine root, the folder containing Engine/ (default: $UE_ROOT, then
+             the project's EngineAssociation resolved via registered builds and
+             common install locations)
+  --dry-run  print the UBT command instead of running it
+
+Exit code is UBT's own.
+USAGE
+}
+
+project="."
+target=""
+config="Development"
+engine="${UE_ROOT:-}"
+dry=0
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--project) project="$2"; shift 2 ;;
+		--target)  target="$2"; shift 2 ;;
+		--config)  config="$2"; shift 2 ;;
+		--engine)  engine="$2"; shift 2 ;;
+		--dry-run) dry=1; shift ;;
+		-h|--help) usage; exit 0 ;;
+		*) echo "ue-build: unknown argument: $1" >&2; usage >&2; exit 2 ;;
+	esac
+done
+
+# Locate the .uproject.
+if [ -f "$project" ]; then
+	uproject="$project"
+else
+	count=$(find "$project" -maxdepth 1 -name '*.uproject' | wc -l | tr -d ' ')
+	if [ "$count" = "0" ]; then
+		echo "ERROR: ue-build: no .uproject found in $project" >&2; exit 2
+	elif [ "$count" != "1" ]; then
+		echo "ERROR: ue-build: more than one .uproject in $project; pass --project FILE" >&2; exit 2
+	fi
+	uproject=$(find "$project" -maxdepth 1 -name '*.uproject')
+fi
+uproject=$(cd "$(dirname "$uproject")" && pwd)/$(basename "$uproject")
+name=$(basename "$uproject" .uproject)
+[ -n "$target" ] || target="${name}Editor"
+
+# Resolve the engine root.
+assoc=$(sed -n 's/.*"EngineAssociation"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$uproject" | head -n 1)
+
+is_engine() { [ -n "$1" ] && [ -d "$1/Engine/Build/BatchFiles" ]; }
+
+if ! is_engine "$engine"; then
+	engine=""
+	# Source builds registered with the engine's own registration step.
+	ini="$HOME/.config/Epic/UnrealEngine/Install.ini"
+	if [ -n "$assoc" ] && [ -f "$ini" ]; then
+		cand=$(sed -n "s/^[[:space:]]*$assoc[[:space:]]*=[[:space:]]*//p" "$ini" | head -n 1)
+		is_engine "$cand" && engine="$cand"
+	fi
+	# Common install locations for a versioned association like "5.4".
+	if [ -z "$engine" ] && [ -n "$assoc" ]; then
+		for cand in \
+			"$HOME/UnrealEngine/UE_$assoc" "$HOME/Epic/UE_$assoc" "$HOME/UE_$assoc" \
+			"/opt/UnrealEngine/UE_$assoc" "/opt/UE_$assoc" \
+			"/Users/Shared/Epic Games/UE_$assoc" \
+			"$HOME/UnrealEngine" "/opt/UnrealEngine"; do
+			if is_engine "$cand"; then engine="$cand"; break; fi
+		done
+	fi
+fi
+
+if ! is_engine "$engine"; then
+	echo "ERROR: ue-build: cannot find the Unreal Engine install (EngineAssociation \"$assoc\"). Set UE_ROOT to the folder containing Engine/, or pass --engine." >&2
+	exit 2
+fi
+
+case "$(uname -s)" in
+	Linux)  platform=Linux; script="$engine/Engine/Build/BatchFiles/Linux/Build.sh" ;;
+	Darwin) platform=Mac;   script="$engine/Engine/Build/BatchFiles/Mac/Build.sh" ;;
+	*) echo "ERROR: ue-build: unsupported OS $(uname -s); on Windows use ue-build.ps1" >&2; exit 2 ;;
+esac
+
+if [ "$dry" = "1" ]; then
+	printf '%s %s %s %s -Project=%s -WaitMutex\n' "$script" "$target" "$platform" "$config" "$uproject"
+	exit 0
+fi
+
+echo "ue-build: $target $platform $config ($engine)" >&2
+exec "$script" "$target" "$platform" "$config" "-Project=$uproject" -WaitMutex

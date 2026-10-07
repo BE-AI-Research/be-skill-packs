@@ -1,0 +1,19 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Components/ActorComponent.h"
+#include "{{NAME}}.generated.h"
+
+UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
+class {{MODULE_API}} U{{NAME}} : public UActorComponent
+{
+	GENERATED_BODY()
+
+public:
+	U{{NAME}}();
+
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+protected:
+	virtual void BeginPlay() override;
+};
