@@ -193,8 +193,18 @@ next: If the dependency is already present, the class may be missing its
 ```
 
 - One `##` entry per failure. Entries are tried in file order and the first
-  match wins, so put specific entries before general ones and finish with a
-  catch-all (`match: .`).
+  match wins, so put specific entries before general ones.
+- **Do not write a catch-all** (`match: .`). It is the tempting last line of a
+  playbook and it makes the pack worse: it fires on every failure the pack does
+  not actually know, and generic advice attached to a diagnostic measures worse
+  than the diagnostic on its own. An unmatched failure should reach the model
+  bare. Both shipped packs end without one, and a syntax error matching nothing
+  is the intended outcome rather than a gap to fill.
+- Write each `match` against output you have actually seen. A rule id or error
+  code taken from documentation is a guess, and a guess that never fires is
+  indistinguishable from a working entry until someone needs it. `packs/ui-web`
+  keeps the captured output it was written from in
+  `fixtures/ui-web/captured/`, which is a pattern worth copying.
 - `match` is a regular expression tried against the diagnostic's raw line and
   its message.
 - `kind` restricts an entry to one diagnostic kind; `any`, or no kind, takes

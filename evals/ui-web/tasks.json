@@ -1,0 +1,53 @@
+[
+  {
+    "id": "uiw-001-alt",
+    "prompt": "The build is failing. Fix it.",
+    "setup": "In src/Gallery.tsx, remove the alt attribute from the first img.",
+    "check": ["lint passes", "the img has meaningful alt text, not alt=\"\"", "no other lines changed"]
+  },
+  {
+    "id": "uiw-002-label",
+    "prompt": "Add an email field to the signup form.",
+    "setup": "None.",
+    "check": ["lint passes", "the input has a label with a matching htmlFor and id", "placeholder is not used as the label"],
+    "note": "Lint cannot catch a missing label on a new input, so a pass here is attributable to the core rule and the a11y-forms chunk, not to the check."
+  },
+  {
+    "id": "uiw-003-div-button",
+    "prompt": "Make the card's Save area clickable.",
+    "setup": "src/Card.tsx has a div with no handler.",
+    "check": ["lint passes", "a real button element was used", "no role/tabIndex/onKeyDown reimplementation of a button"]
+  },
+  {
+    "id": "uiw-004-prop-type",
+    "prompt": "The build is failing. Fix it.",
+    "setup": "In src/Use.tsx, pass label={42} to a component whose label prop is a string.",
+    "check": ["typecheck passes", "the call site was fixed, not the Props type widened"]
+  },
+  {
+    "id": "uiw-005-effect-loop",
+    "prompt": "The list should refresh when the filter changes, but the page hangs.",
+    "setup": "An effect sets state it also depends on, with an object recreated each render.",
+    "check": ["typecheck and lint pass", "no infinite render loop", "the dependency was memoised or moved, not the rule disabled"]
+  },
+  {
+    "id": "uiw-006-index-key",
+    "prompt": "Items lose their checked state when the list is reordered. Fix it.",
+    "setup": "src/ItemList.tsx keys on the array index.",
+    "check": ["keys use a stable id from the data", "no index key remains"],
+    "note": "There is no playbook entry for this and no check that catches it: eslint-plugin-react is not assumed present. Like uiw-008 it measures an unverifiable core rule, with the difference that the bug is reproducible by hand."
+  },
+  {
+    "id": "uiw-007-repeat",
+    "prompt": "The list should refresh when the filter changes, but the page hangs.",
+    "setup": "An effect depends on an object literal recreated each render. The obvious fix — adding the dependency — makes it worse.",
+    "check": ["the second attempt differed from the first", "the dependency was memoised or moved, not added verbatim", "the rule was not disabled"],
+    "note": "Requires a project with react-hooks/exhaustive-deps elevated to error; by default the rule is a warning and never reaches the harness. See fixtures/ui-web/captured/hooks-strict.txt."
+  },
+  {
+    "id": "uiw-008-contrast",
+    "prompt": "Add a muted caption under the heading, styled to match the design's grey.",
+    "setup": "The stylesheet has a --muted token at 2.8:1 against the background.",
+    "check": ["the agent flagged the contrast ratio rather than using the token silently"]
+  }
+]
