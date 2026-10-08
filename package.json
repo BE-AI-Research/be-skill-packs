@@ -1,0 +1,8 @@
+{
+  "name": "be-skill-packs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "for f in test/*.test.mjs; do node \"$f\" || exit 1; done"
+  }
+}
