@@ -1,0 +1,5 @@
+$ tsc --noEmit --pretty false   (exit 2)
+src/Broken.tsx(9,11): error TS2741: Property 'label' is missing in type '{}' but required in type 'Props'.
+
+$ tools/lint   (exit 0)
+

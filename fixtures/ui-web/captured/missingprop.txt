@@ -1,0 +1,5 @@
+$ tsc --noEmit --pretty false   (exit 2)
+src/Broken.tsx(8,11): error TS2739: Type '{}' is missing the following properties from type 'Props': label, onClick
+
+$ tools/lint   (exit 0)
+

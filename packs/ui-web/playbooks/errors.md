@@ -45,3 +45,39 @@ fix:
 1. Replace the element with a real `button` (or `a` if it navigates). Keyboard handling, focus and semantics then come free.
 2. If the element must stay, it needs `role`, `tabIndex={0}` and key handlers — which is strictly more work than using a button.
 next: If a button's default styling is the reason for the div, remove the styling instead: `appearance: none` on a button is less work than reimplementing a button.
+
+## Hook called conditionally
+match: react-hooks/rules-of-hooks|React Hook .* is called conditionally
+kind: compile
+cause: A hook is inside a condition, loop or early return. React identifies hooks by call order, so a changing order corrupts state between renders.
+fix:
+1. Move the hook to the top level of the component, before any condition or early return.
+2. Put the condition inside the hook instead: `useEffect(() => { if (flag) … }, [flag])`.
+next: If the two branches genuinely need different hooks, they are two components. Split them and choose between them in the parent.
+
+## Effect is missing a dependency
+match: react-hooks/exhaustive-deps|React Hook .* has (a )?missing dependenc
+kind: compile
+cause: The effect reads a value it does not list. Adding the value is often the wrong fix. This only reaches you if the project has elevated the rule to an error; by default it is a warning.
+fix:
+1. First ask whether the effect is needed at all — a value derived from props or state should be computed during render, and a response to a user action belongs in the event handler.
+2. If the effect is right, move the function or value inside it so it is not a dependency.
+next: If adding the dependency caused an infinite loop, the value is recreated on every render. Memoise it with useCallback or useMemo, move it out of the effect's inputs, or lift it — do not disable the rule.
+
+## Prop type does not match
+match: TS2322|TS2739|TS2741|TS2345
+kind: compile
+cause: A prop or argument was passed with the wrong type, or a required prop was not passed at all. The component's own Props type is the contract.
+fix:
+1. Read the component's Props type. The error names the expected type and what was given.
+2. Fix the call site, not the type — widening the type to make the error go away removes the check that found a real mistake.
+next: If the value genuinely can be either type, model that in the type: a union with narrowing at the point of use, or a discriminated union if the variants carry different data.
+
+## Value may be null or undefined
+match: TS18048|TS18047
+kind: compile
+cause: An optional prop, a nullable value, or data that has not arrived yet is being used as though it is always present.
+fix:
+1. Handle the absent case explicitly: an early return, a default value, or conditional rendering.
+2. Do not reach for `!` to silence it — the checker is describing a state your component can actually be in.
+next: If the value is always present by the time this renders, the type is wrong rather than the code: make the prop required, or split the component so the loaded case has its own non-optional props.

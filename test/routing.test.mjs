@@ -1,5 +1,5 @@
 import { test, assert } from "./run.mjs";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { parsePlaybook, matchEntry } from "./playbook.mjs";
 
 const root = new URL("../", import.meta.url).pathname;
@@ -76,4 +76,103 @@ test("there is no catch-all entry", () => {
   for (const e of entries) {
     assert(e.match.source !== ".", `${e.title} is a catch-all`);
   }
+});
+
+test("a prop type mismatch routes to the props entry", () => {
+  const line = captured("props").find((l) => /TS2322|TS2741|TS2739/.test(l));
+  assert(line, "no captured prop diagnostic");
+  const hit = route(line);
+  assert(hit && /prop/i.test(hit.title), `${line}\n  routed to ${hit && hit.title}`);
+});
+
+test("a possibly-undefined access routes to the nullable entry", () => {
+  const line = captured("nullable").find((l) => /TS18048|TS2532|TS2531/.test(l));
+  assert(line, "no captured nullable diagnostic");
+  const hit = route(line);
+  assert(hit && /undefined|optional/i.test(hit.title), `${line}\n  routed to ${hit && hit.title}`);
+});
+
+test("a conditional hook routes to the hooks entry", () => {
+  const line = captured("hooks").find((l) => /rules-of-hooks/.test(l));
+  assert(line, "no captured rules-of-hooks diagnostic");
+  const hit = route(line);
+  assert(hit && /hook/i.test(hit.title), `${line}\n  routed to ${hit && hit.title}`);
+});
+
+// Review Focus 5: a syntax error has no entry, and that is correct. With no
+// catch-all, the parsed diagnostic reaches the model on its own rather than
+// with generic advice attached — which measures worse than the message alone.
+test("a syntax error routes to nothing, and that is the intended outcome", () => {
+  const lines = captured("syntax");
+  assert(lines.length > 0, "no captured syntax diagnostics");
+  for (const line of lines) {
+    const hit = route(line);
+    assert(
+      hit === null,
+      `${line}\n  matched ${hit && hit.title}; a syntax error should match no entry`,
+    );
+  }
+});
+
+// Spec §5.3: entries are ordered by information gap, so the entry whose
+// obvious fix is wrong comes first and the most self-explaining codes last.
+test("entries are ordered by information gap", () => {
+  const titles = entries.map((e) => e.title);
+  const deps = titles.findIndex((t) => /missing a dependency/i.test(t));
+  const props = titles.findIndex((t) => /Prop type/i.test(t));
+  assert(deps !== -1 && props !== -1, `missing expected entries in ${titles.join(", ")}`);
+  assert(
+    deps < props,
+    "exhaustive-deps must precede the prop-mismatch entry: its message is the less useful of the two",
+  );
+});
+
+// The invariant the whole capture discipline exists to produce: nothing the
+// toolchain actually emits goes unrouted. Syntax errors are the one deliberate
+// exception and have their own test above.
+test("every captured diagnostic outside the syntax case routes somewhere", () => {
+  const dir = new URL("../fixtures/ui-web/captured/", import.meta.url).pathname;
+  const names = readdirSync(dir)
+    .filter((f) => f.endsWith(".txt"))
+    .map((f) => f.replace(/\.txt$/, ""))
+    .filter((n) => n !== "syntax");
+  assert(names.length >= 8, `only ${names.length} captured files`);
+  for (const name of names) {
+    const lines = captured(name);
+    assert(lines.length > 0, `${name}: captured no diagnostic at all`);
+    for (const line of lines) {
+      assert(route(line), `${name}: nothing matched\n  ${line}`);
+    }
+  }
+});
+
+// Each code below was observed in a captured file; the codes the plan guessed
+// at (TS2531, TS2532, TS2533) were not, and are in no match.
+test("every TypeScript code a captured file proves routes to the right entry", () => {
+  const wants = [
+    ["props", /TS2322/, /Prop type/i],
+    ["missingprop", /TS2739/, /Prop type/i],
+    ["missingprop1", /TS2741/, /Prop type/i],
+    ["wrongarg", /TS2345/, /Prop type/i],
+    ["nullable", /TS18048/, /undefined/i],
+    ["nullobject", /TS18047/, /undefined/i],
+  ];
+  for (const [file, code, title] of wants) {
+    const line = captured(file).find((l) => code.test(l));
+    assert(line, `${file}: no captured line for ${code}`);
+    const hit = route(line);
+    assert(hit && title.test(hit.title), `${line}\n  routed to ${hit && hit.title}, want ${title}`);
+  }
+});
+
+// The dependency entry is reachable only for a project that elevates
+// exhaustive-deps to an error. hooks-strict.txt is that project, captured.
+test("an elevated exhaustive-deps diagnostic routes to the dependency entry", () => {
+  const line = captured("hooks-strict").find((l) => /exhaustive-deps/.test(l));
+  assert(line, "no captured exhaustive-deps diagnostic");
+  const hit = route(line);
+  assert(
+    hit && /missing a dependency/i.test(hit.title),
+    `${line}\n  routed to ${hit && hit.title}`,
+  );
 });

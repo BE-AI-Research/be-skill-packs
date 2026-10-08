@@ -1,0 +1,5 @@
+$ tsc --noEmit --pretty false   (exit 2)
+src/Broken.tsx(5,14): error TS18047: 'name' is possibly 'null'.
+
+$ tools/lint   (exit 0)
+
