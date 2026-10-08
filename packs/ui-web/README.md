@@ -31,8 +31,21 @@ Worth knowing before you rely on it:
   interfaces (83.9% of the top million homepages) — is invisible to static
   analysis, because it needs computed colours at runtime. It is a core rule
   here, not a check.
-- Static lint catches four of the six most common accessibility failures.
-  Contrast and a missing document language are not among them.
+- Static lint reaches fewer of the most common failures than it looks like it
+  should, measured against `fixtures/ui-web/captured/a11y.txt` rather than
+  estimated. Of WebAIM's six most frequent defects it catches missing alt text
+  and empty links outright; it catches missing form labels only from the
+  `<label>` side, when a label exists with no control; and it catches nothing
+  at all for contrast, empty buttons, or a missing document language. An
+  `<input>` with no label anywhere — 51% of real pages — produces no
+  diagnostic in any standard configuration: `control-has-associated-label` is
+  off in `jsx-a11y`'s recommended rules, and its own defaults ignore `input`
+  and `textarea` even when you turn it on. That is why those defects are core
+  rules here instead of playbook entries.
+- Stale `useEffect` dependencies are core guidance for the same reason:
+  `react-hooks/exhaustive-deps` is a *warning* in the plugin's recommended
+  config and in Next.js's, and `tools/lint` drops warnings so they cannot fail
+  a check. Set it to `"error"` in your own config if you want it enforced.
 - Even a rendered accessibility scan reaches only about 57% of WCAG issues,
   and this pack does not render.
 - `eslint-plugin-jsx-a11y` cannot see values arriving through props, so a
