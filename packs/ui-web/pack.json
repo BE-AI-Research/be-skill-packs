@@ -40,24 +40,28 @@
   "verify": [
     {
       "name": "types",
-      "cmd": ["npx", "tsc", "--noEmit", "--pretty", "false"],
+      "cmd": ["node", "{pack}/tools/typecheck", "--project", "{workspace}"],
       "parser": "msvc",
       "timeout": "5m",
-      "when": { "changed": ["src/**", "*.ts", "*.tsx", "package.json", "tsconfig.json"] }
+      "when": {
+        "changed": ["**/*.ts", "**/*.tsx", "*.ts", "*.tsx", "package.json", "tsconfig*.json"]
+      }
     },
     {
       "name": "lint",
-      "cmd": ["{pack}/tools/lint", "--project", "{workspace}"],
+      "cmd": ["node", "{pack}/tools/lint", "--project", "{workspace}"],
       "parser": "msvc",
       "timeout": "5m",
-      "when": { "changed": ["src/**", "*.ts", "*.tsx", "eslint.config.*"] }
+      "when": {
+        "changed": ["**/*.ts", "**/*.tsx", "*.ts", "*.tsx", "eslint.config.*", ".eslintrc*"]
+      }
     },
     {
       "name": "test",
-      "cmd": ["{pack}/tools/test", "--project", "{workspace}"],
+      "cmd": ["node", "{pack}/tools/test", "--project", "{workspace}"],
       "parser": "generic",
       "timeout": "10m",
-      "when": { "changed": ["src/**", "*.ts", "*.tsx"] }
+      "when": { "changed": ["**/*.ts", "**/*.tsx", "*.ts", "*.tsx"] }
     }
   ],
   "playbooks": ["playbooks/errors.md"],

@@ -1,0 +1,96 @@
+#!/usr/bin/env node
+// Runs the project's own TypeScript compiler and lets its output through
+// unchanged: tsc already prints `path(line,col): error TSxxxx: message`, which
+// is the shape BE-Code's msvc parser reads.
+//
+// Why a wrapper rather than naming `tsc` in the manifest, three measured
+// reasons:
+//
+// 1. `npx tsc` does not resolve to TypeScript. In a project with no local
+//    typescript it fetches and runs tsc@2.0.4 — an unmaintained third-party
+//    package that prints "This is not the tsc command you are looking for" and
+//    exits 1. In an offline-first harness that is a network fetch and an
+//    execution of someone else's code on every verify run, and the output is
+//    unparsable so the repair loop learns nothing. This wrapper uses the
+//    project's own compiler and never reaches for npx.
+//
+// 2. `tsc --noEmit` checks nothing on a solution-style root tsconfig — the
+//    `files: []` plus `references` shape that Vite's react-ts template
+//    generates. It compiles the root project, which owns no files, and exits
+//    0. The check reported every such project green no matter how broken it
+//    was. Where the root delegates, this wrapper uses `tsc -b`, which walks
+//    the referenced projects and finds their errors.
+//
+// 3. A toolchain that is absent must be inert and say so, not fail. A pack
+//    activates on any project with a package.json and a .tsx file, and plenty
+//    of those have no local typescript; failing them would make the pack
+//    worse than not installing it.
+
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { join } from "node:path";
+
+const args = process.argv.slice(2);
+let project = process.cwd();
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === "--project" && args[i + 1]) project = args[++i];
+}
+// ESLint and tsc both report realpaths. Resolving the workspace too keeps a
+// project reached through a symlink — /home/me/work -> /mnt/data/work, or
+// macOS's own symlinked temp dir — from yielding ../real/src/x.tsx paths that
+// point outside the workspace the harness confines reads to.
+try {
+  project = realpathSync(project);
+} catch {
+  /* a path that cannot be resolved is reported as given */
+}
+
+const tsconfig = join(project, "tsconfig.json");
+if (!existsSync(tsconfig)) {
+  console.log("no tsconfig.json in this project; type check skipped");
+  process.exit(0);
+}
+
+// The project's own compiler, never a fetched one. `tsc` lives in .bin as a
+// shell script on Unix and a .cmd shim on Windows, neither of which spawn can
+// execute directly there, so run the package's entry point with node instead:
+// one code path, both platforms, no shell.
+const local = join(project, "node_modules", "typescript", "bin", "tsc");
+if (!existsSync(local)) {
+  console.log("typescript is not installed in this project; type check skipped");
+  process.exit(0);
+}
+
+// A root tsconfig that owns no input files is delegating to its references,
+// and only `-b` follows them. Comments are legal in tsconfig, so a parse
+// failure here means "assume the ordinary shape" rather than refusing to run.
+function delegates(path) {
+  try {
+    const text = readFileSync(path, "utf8");
+    const cfg = JSON.parse(text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "$1"));
+    const hasReferences = Array.isArray(cfg.references) && cfg.references.length > 0;
+    const ownsFiles =
+      (Array.isArray(cfg.files) && cfg.files.length > 0) ||
+      (Array.isArray(cfg.include) && cfg.include.length > 0);
+    return hasReferences && !ownsFiles;
+  } catch {
+    return false;
+  }
+}
+
+const argv = delegates(tsconfig)
+  ? [local, "-b", "--pretty", "false"]
+  : [local, "--noEmit", "--pretty", "false"];
+
+const res = spawnSync(process.execPath, argv, { cwd: project, encoding: "utf8", shell: false });
+
+if (res.error) {
+  // The most likely cause in an offline harness is a toolchain that is not
+  // there. Say which, rather than "no output".
+  process.stderr.write(`could not run the type check: ${res.error.message}\n`);
+  process.exit(1);
+}
+
+const out = (res.stdout ?? "") + (res.stderr ?? "");
+if (out.trim() !== "") process.stdout.write(out.endsWith("\n") ? out : out + "\n");
+process.exit(res.status ?? 0);

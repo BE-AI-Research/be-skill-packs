@@ -1,4 +1,4 @@
-$ tsc --noEmit --pretty false   (exit 2)
+$ tools/typecheck   (exit 2)
 src/Broken.tsx(2,14): error TS18048: 'items' is possibly 'undefined'.
 
 $ tools/lint   (exit 0)

@@ -165,6 +165,40 @@ test("every TypeScript code a captured file proves routes to the right entry", (
   }
 });
 
+// A whole-branch review found this one by routing the pack's own a11y-focus
+// Dialog example through the pack's own matcher. jsx-a11y reports
+// no-noninteractive-element-interactions for a key handler on a role="dialog"
+// container, that line matched "Click handler on a non-interactive element",
+// and its fix says "replace the element with a real button" — which deletes
+// the dialog. The rule was never in any captured file, so it was a guess in
+// the first place; with no catch-all, the message now reaches the model alone,
+// which is the right outcome for a failure the pack does not actually know.
+test("a non-interactive-element-interactions diagnostic routes to nothing", () => {
+  const line =
+    'src/Dialog.tsx(14,5): error ESL001: jsx-a11y/no-noninteractive-element-interactions: ' +
+    "Non-interactive elements should not be assigned mouse or keyboard event listeners.";
+  const hit = route(line);
+  assert(
+    hit === null,
+    `routed to ${hit && hit.title}, whose fix would replace a dialog with a button`,
+  );
+});
+
+// TS2345 is the generic wrong-argument error and fires anywhere in a project —
+// a utility, a reducer, a test helper. Its own captured evidence
+// (captured/wrongarg.txt) is a plain function call with no component and no
+// Props type in the file, so an entry telling the model to go and read a
+// Props type sends it looking for something that does not exist.
+test("the prop entry's fix does not assume a component", () => {
+  const line = "src/wrongarg.tsx(7,20): error TS2345: Argument of type 'number' is not assignable.";
+  const hit = route(line);
+  assert(hit, "TS2345 must still route");
+  assert(
+    /signature/i.test(hit.fix),
+    `fix must name the signature the error reports, not only a Props type:\n${hit.fix}`,
+  );
+});
+
 // The dependency entry is reachable only for a project that elevates
 // exhaustive-deps to an error. hooks-strict.txt is that project, captured.
 test("an elevated exhaustive-deps diagnostic routes to the dependency entry", () => {

@@ -2,6 +2,9 @@ type {{NAME}}Props = {
   // Required props first, no defaults. Optional props get a default below.
 };
 
-export function {{NAME}}({}: {{NAME}}Props) {
+// Destructure the props you add above; an empty `{}` pattern fails
+// no-empty-pattern, which is in eslint:recommended.
+export function {{NAME}}(props: {{NAME}}Props) {
+  void props;
   return null;
 }

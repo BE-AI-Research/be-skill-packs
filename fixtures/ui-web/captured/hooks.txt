@@ -1,4 +1,4 @@
-$ tsc --noEmit --pretty false   (exit 0)
+$ tools/typecheck   (exit 0)
 
 
 $ tools/lint   (exit 1)

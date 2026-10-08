@@ -31,11 +31,21 @@ if (!pkg.scripts || !pkg.scripts.test) {
   process.exit(0);
 }
 
-const res = spawnSync("npm", ["test", "--silent"], {
+// On Windows `npm` is npm.cmd, which spawn cannot execute without a shell —
+// and a shell is what the argv-not-a-string rule exists to avoid. Naming the
+// shim directly keeps one code path and no shell on either platform.
+const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+const res = spawnSync(npm, ["test", "--silent"], {
   cwd: project,
   encoding: "utf8",
   shell: false,
 });
+if (res.error) {
+  // Most likely cause in an offline harness: npm is not on PATH. Say which,
+  // rather than reporting an empty failure.
+  process.stderr.write(`could not run the test script: ${res.error.message}\n`);
+  process.exit(1);
+}
 process.stdout.write(res.stdout ?? "");
 process.stderr.write(res.stderr ?? "");
 process.exit(res.status ?? 1);

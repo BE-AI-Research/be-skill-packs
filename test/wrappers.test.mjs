@@ -8,6 +8,17 @@ const LINT = new URL("../packs/ui-web/tools/lint", import.meta.url).pathname;
 const TESTW = new URL("../packs/ui-web/tools/test", import.meta.url).pathname;
 const FIXTURE = new URL("../fixtures/ui-web", import.meta.url).pathname;
 
+// The regex BE-Code's msvc parser actually applies, copied from
+// internal/verify/ubt.go (reMSVC). Checking our output against our own idea of
+// the shape is what let the first version of the wrapper ship a code the
+// parser could not read: every line fell through to "exit code 1 and no
+// recognisable error line", so the model got no diagnosis and no playbook
+// entry. If BE-Code ever loosens this pattern, this is the thing to update —
+// deliberately, not by accident. Declared here because run.mjs executes each
+// test as it is defined, so a test above this line could not see it.
+const RE_MSVC =
+  /^\s*(?<file>.+?)\((?<line>\d+)(?:,(?<col>\d+))?\)\s*:\s*(?<sev>fatal error|error|warning)\s+(?<code>[A-Z]{1,3}\d{3,5})\s*:\s*(?<msg>.*)$/;
+
 function run(bin, dir) {
   try {
     return { out: execFileSync(bin, ["--project", dir], { encoding: "utf8" }), code: 0 };
@@ -28,6 +39,56 @@ function scaffold(dir, { eslintConfig = true } = {}) {
   symlinkSync(join(FIXTURE, "node_modules"), join(dir, "node_modules"), "dir");
   return dir;
 }
+
+// A whole-branch review reproduced this: the wrapper passed "src" to ESLint as
+// a path, so any project whose sources live elsewhere — Next.js and Remix put
+// them in app/, monorepo packages anywhere — got "No files matching the pattern
+// src were found" and exit 2. The pack activates on any package.json plus a
+// .tsx file, so for those projects the lint check could never pass, and the
+// repair loop saw a failing check it could not diagnose. Linting "." instead
+// lets the flat config's own `files` globs decide, which is the canonical
+// ESLint 9 invocation.
+test("a project whose sources are not in src/ is still linted", () => {
+  const dir = mkdtempSync(join(tmpdir(), "app-"));
+  mkdirSync(join(dir, "app"), { recursive: true });
+  cpSync(join(FIXTURE, "package.json"), join(dir, "package.json"));
+  cpSync(join(FIXTURE, "tsconfig.json"), join(dir, "tsconfig.json"));
+  symlinkSync(join(FIXTURE, "node_modules"), join(dir, "node_modules"), "dir");
+  // A config that covers the whole project, as such a project's own would.
+  writeFileSync(
+    join(dir, "eslint.config.mjs"),
+    `import jsxA11y from "eslint-plugin-jsx-a11y";
+import tseslint from "typescript-eslint";
+export default [
+  {
+    files: ["**/*.{ts,tsx}"],
+    languageOptions: { parser: tseslint.parser, parserOptions: { ecmaFeatures: { jsx: true } } },
+    plugins: { "jsx-a11y": jsxA11y },
+    rules: { ...jsxA11y.flatConfigs.recommended.rules },
+  },
+];
+`,
+  );
+  writeFileSync(join(dir, "app", "Bad.tsx"), 'export const I = () => <img src="x.png" />;\n');
+  const { out, code } = run(LINT, dir);
+  assert(code !== 0, `a violation in app/ must fail the check: ${out}`);
+  assert(/^app\/Bad\.tsx\(\d+,\d+\): error ESL001: jsx-a11y\/alt-text:/m.test(out), out);
+});
+
+// The same review: ESLint reports realpaths, so a workspace reached through a
+// symlink produced ../real/src/x.tsx — a path resolving outside the workspace,
+// which the harness confines file reads to, naming a file the model cannot
+// open.
+test("a workspace reached through a symlink still yields relative paths", () => {
+  const base = mkdtempSync(join(tmpdir(), "link-"));
+  const real = scaffold(join(base, "real"));
+  writeFileSync(join(real, "src", "NoAlt.tsx"), 'export const I = () => <img src="x.png" />;\n');
+  const link = join(base, "link");
+  symlinkSync(real, link, "dir");
+  const { out } = run(LINT, link);
+  assert(/^src\/NoAlt\.tsx\(\d+,\d+\): error ESL001:/m.test(out), out);
+  assert(!out.includes(".."), `path escaped the workspace: ${out}`);
+});
 
 // Review Focus 1: a bare project with no ESLint config. The wrapper must be
 // inert, not failing — otherwise the pack breaks every project it activates
@@ -80,7 +141,14 @@ test("a broken eslint config fails without emitting fake diagnostics", () => {
   writeFileSync(join(dir, "eslint.config.mjs"), "this is not javascript (((\n");
   const { out, code } = run(LINT, dir);
   assert(code !== 0, "a config error must not pass");
-  assert(!/\(\d+,\d+\): error [a-z@/-]+:/.test(out), `emitted a fake diagnostic: ${out}`);
+  // Stated positively, against the harness's own pattern. The first version of
+  // this assertion used a hand-written character class that excluded digits
+  // and uppercase, so it could not match any real diagnostic line — including
+  // the ones it was meant to catch — and would have shipped green through a
+  // regression that started inventing findings.
+  for (const line of out.split("\n")) {
+    assert(!RE_MSVC.test(line), `emitted a fake diagnostic: ${line}`);
+  }
 });
 
 test("a real violation is emitted in the documented shape", () => {
@@ -90,16 +158,6 @@ test("a real violation is emitted in the documented shape", () => {
   assert(code !== 0, "a violation must fail the check");
   assert(/^src\/NoAlt\.tsx\(\d+,\d+\): error ESL001: jsx-a11y\/alt-text:/m.test(out), out);
 });
-
-// The regex BE-Code's msvc parser actually applies, copied from
-// internal/verify/ubt.go (reMSVC). Checking our output against our own idea of
-// the shape is what let the first version of the wrapper ship a code the
-// parser could not read: every line fell through to "exit code 1 and no
-// recognisable error line", so the model got no diagnosis and no playbook
-// entry. If BE-Code ever loosens this pattern, this test is the thing to
-// update — deliberately, not by accident.
-const RE_MSVC =
-  /^\s*(?<file>.+?)\((?<line>\d+)(?:,(?<col>\d+))?\)\s*:\s*(?<sev>fatal error|error|warning)\s+(?<code>[A-Z]{1,3}\d{3,5})\s*:\s*(?<msg>.*)$/;
 
 test("every emitted line parses with the harness's own msvc pattern", () => {
   const dir = scaffold(mkdtempSync(join(tmpdir(), "parse-")));

@@ -14,20 +14,25 @@ export function Dialog({ onClose, children }: Props) {
     // Remember where focus was, so closing can put it back.
     returnTo.current = document.activeElement as HTMLElement | null;
     ref.current?.focus();
-    return () => returnTo.current?.focus();
-  }, []);
 
+    // Escape belongs on the document, not on the dialog element. A key
+    // listener on a non-interactive element only fires while that element
+    // itself has focus — and once the user tabs to a control inside, it does
+    // not. It is also a lint error (no-noninteractive-element-interactions).
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      returnTo.current?.focus();
+    };
+  }, [onClose]);
+
+  // A real modal also traps Tab inside itself — see the rules below. This
+  // example shows naming, focus and return only.
   return (
-    <div
-      ref={ref}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="dialog-title"
-      tabIndex={-1}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") onClose();
-      }}
-    >
+    <div ref={ref} role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabIndex={-1}>
       <h2 id="dialog-title">Confirm</h2>
       {children}
     </div>

@@ -3,3 +3,10 @@
 *.ps1 text eol=crlf
 *.cmd text eol=crlf
 *.sh  text eol=lf
+
+# The pack wrappers are extensionless Node scripts, so nothing above covers
+# them. On a Windows checkout with the default core.autocrlf=true they would
+# get CRLF endings, and then `#!/usr/bin/env node` becomes `node\r` — the
+# script dies as "node\r: No such file or directory" the moment the pack is
+# copied to WSL or a Linux box. Pin LF.
+packs/*/tools/* text eol=lf

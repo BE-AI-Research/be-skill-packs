@@ -1,4 +1,4 @@
-$ tsc --noEmit --pretty false   (exit 2)
+$ tools/typecheck   (exit 2)
 src/Broken.tsx(6,18): error TS2322: Type 'number' is not assignable to type 'string'.
 
 $ tools/lint   (exit 0)

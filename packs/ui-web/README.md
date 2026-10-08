@@ -14,14 +14,32 @@ Activates in any workspace with a `package.json` and a `.tsx` file.
 
 | check | command | when it does nothing |
 |---|---|---|
-| `types` | `tsc --noEmit` | never |
-| `lint` | ESLint via `tools/lint` | the project has no ESLint config |
+| `types` | TypeScript via `tools/typecheck` | no `tsconfig.json`, or TypeScript is not installed |
+| `lint` | ESLint via `tools/lint` | no ESLint config, or ESLint is not installed |
 | `test` | the project's own test script | there is no test script |
 
-The lint wrapper converts ESLint's JSON to the shape the harness parses, using
-the rule name as the error code. ESLint has removed the two formatters that
-would have parsed directly (`unix` and `compact`), so the conversion lives
-here rather than depending on a formatter that may vanish again.
+All three run the project's **own** installed tools and never a package runner.
+`npx tsc` in particular does not resolve to TypeScript: in a project without a
+local copy it fetches and runs `tsc@2.0.4`, an unmaintained package by another
+author, which is both a network fetch in an offline-first harness and output no
+parser can read. A check whose tool is absent is inert and says so, rather than
+failing a project it cannot help.
+
+`tools/typecheck` also decides between `tsc --noEmit` and `tsc -b`. A
+solution-style root `tsconfig.json` — `files: []` plus `references`, the shape
+Vite's React template generates — owns no files, so plain `--noEmit` compiles
+nothing and exits 0. Reporting green without checking is worse than failing, so
+where the root delegates, the wrapper builds the referenced projects instead.
+
+`tools/lint` converts ESLint's JSON to the shape the harness parses: the
+constant code `ESL001` with the rule name leading the message. The rule name
+cannot be the code, because the parser's code group is `[A-Z]{1,3}\d{3,5}` —
+`TS18048` fits and `jsx-a11y/alt-text` cannot — and a playbook `match` is tried
+against the raw line as well as the message, so matching on the rule name still
+works. ESLint has removed the two formatters that would have parsed directly
+(`unix` and `compact`), so the conversion lives here rather than depending on a
+formatter that may vanish again. It lints `.`, letting the flat config's own
+`files` globs decide, so a project keeping sources in `app/` is checked too.
 
 ## What it cannot check
 

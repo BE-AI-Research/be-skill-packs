@@ -22,7 +22,7 @@
 // message. The code is constant across rules, and the anti-loop signature
 // stays distinct because it also covers the normalised message.
 
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { relative, join, sep } from "node:path";
 
@@ -30,6 +30,15 @@ const args = process.argv.slice(2);
 let project = process.cwd();
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--project" && args[i + 1]) project = args[++i];
+}
+// ESLint reports realpaths, so a workspace reached through a symlink —
+// /home/me/work -> /mnt/data/work, or macOS's own symlinked temp dir — made
+// `relative` produce ../real/src/x.tsx: a path outside the workspace the
+// harness confines file reads to, naming a file the model cannot open.
+try {
+  project = realpathSync(project);
+} catch {
+  /* a path that cannot be resolved is used as given */
 }
 
 const CONFIGS = [
@@ -47,22 +56,44 @@ if (!CONFIGS.some((c) => existsSync(join(project, c)))) {
   process.exit(0);
 }
 
-// The project's own ESLint, not a fetched one: npx would reach for the
-// network when the dependency is missing, which turns a missing tool into a
-// hang instead of a clear failure.
-const local = join(project, "node_modules", ".bin", "eslint");
-const bin = existsSync(local) ? local : "npx";
-const argv = bin === "npx" ? ["eslint", "src", "--format", "json"] : ["src", "--format", "json"];
+// The project's own ESLint, never a fetched one: npx reaches for the network
+// when the dependency is missing, and in an offline-first harness that is
+// either a hang or someone else's package executing on every verify run. A
+// project that has a config but no installed ESLint is broken in a way this
+// check cannot fix, so it is inert and says so.
+//
+// The package's entry point rather than node_modules/.bin/eslint, because
+// .bin holds a shell script on Unix and a .cmd shim on Windows, and spawn can
+// execute neither there. One code path, both platforms, no shell.
+const local = join(project, "node_modules", "eslint", "bin", "eslint.js");
+if (!existsSync(local)) {
+  console.log("eslint is not installed in this project; lint check skipped");
+  process.exit(0);
+}
 
-const res = spawnSync(bin, argv, { cwd: project, encoding: "utf8", shell: false });
+// "." rather than "src": the flat config's own `files` globs decide what gets
+// linted. Passing a path meant any project keeping sources elsewhere — app/
+// in Next.js and Remix, anywhere in a monorepo package — failed with "No
+// files matching the pattern src were found" and exit 2, a failing check with
+// no diagnosis the repair loop could use.
+const res = spawnSync(process.execPath, [local, ".", "--format", "json"], {
+  cwd: project,
+  encoding: "utf8",
+  shell: false,
+});
 
 let results;
 try {
   results = JSON.parse(res.stdout);
 } catch {
-  // ESLint could not run — a bad config, a missing plugin. Pass its own
-  // complaint through untouched rather than inventing diagnostics.
-  process.stderr.write(res.stderr || res.stdout || "eslint produced no output\n");
+  // ESLint could not run — a bad config, a missing plugin, or a node that
+  // could not be spawned at all. Pass its own complaint through untouched
+  // rather than inventing diagnostics, and name a spawn failure explicitly:
+  // "no output" hid the commonest cause, which is the tool not being there.
+  const why = res.error
+    ? `could not run eslint: ${res.error.message}\n`
+    : res.stderr || res.stdout || "eslint produced no output\n";
+  process.stderr.write(why);
   process.exit(res.status === 0 ? 1 : (res.status ?? 1));
 }
 

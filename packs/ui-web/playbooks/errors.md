@@ -38,7 +38,7 @@ fix:
 next: If the content is injected at runtime, the link must not render at all until it has content — an empty anchor is worse than no anchor. Full rules: `ui-web/a11y-semantics`.
 
 ## Click handler on a non-interactive element
-match: jsx-a11y/click-events-have-key-events|jsx-a11y/no-static-element-interactions|jsx-a11y/no-noninteractive-element-interactions
+match: jsx-a11y/click-events-have-key-events|jsx-a11y/no-static-element-interactions
 kind: compile
 cause: A div or span has an onClick. It is unreachable by keyboard and is not announced as something that can be activated.
 fix:
@@ -67,9 +67,9 @@ next: If adding the dependency caused an infinite loop, the value is recreated o
 ## Prop type does not match
 match: TS2322|TS2739|TS2741|TS2345
 kind: compile
-cause: A prop or argument was passed with the wrong type, or a required prop was not passed at all. The component's own Props type is the contract.
+cause: A prop or argument was passed with the wrong type, or a required prop was not passed at all. The declared signature is the contract.
 fix:
-1. Read the component's Props type. The error names the expected type and what was given.
+1. Read the signature the error names — a component's Props type, or a plain function's parameters. TS2345 fires on any call, not only on JSX. The error states the expected type and what was given.
 2. Fix the call site, not the type — widening the type to make the error go away removes the check that found a real mistake.
 next: If the value genuinely can be either type, model that in the type: a union with narrowing at the point of use, or a discriminated union if the variants carry different data. Full rules: `ui-web/types`.
 

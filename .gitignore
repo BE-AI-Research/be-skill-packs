@@ -1,3 +1,12 @@
 .DS_Store
 .worktrees/
 fixtures/*/node_modules
+
+# scripts/capture.mjs copies a broken variant here and removes it again. If a
+# run is interrupted hard enough to skip even the signal handler, the leftover
+# must not be committable: it would put a deliberately broken file into the
+# fixture's green baseline, which every capture depends on.
+fixtures/*/src/Broken.tsx
+
+# `tsc -b` writes these next to a solution-style tsconfig.
+*.tsbuildinfo

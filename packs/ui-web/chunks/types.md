@@ -32,6 +32,8 @@ export function Field({ label, value, onChange, hint, disabled = false }: Props)
 
 ## What to reach for
 
+The event types come from React and must be imported — `import { type ChangeEvent, type MouseEvent } from "react"`. Without the import, `MouseEvent<HTMLButtonElement>` and `KeyboardEvent<HTMLInputElement>` resolve to the DOM's own globals of those names, which are **not generic**, and you get `TS2315: Type 'MouseEvent' is not generic` — a message that gives no hint an import is missing. `React.MouseEvent<…>` works too, with `import type * as React from "react"`.
+
 | Need | Type |
 | --- | --- |
 | Anything renderable | `ReactNode` — covers strings, numbers, elements, arrays, null. |
