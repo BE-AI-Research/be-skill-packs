@@ -1,0 +1,41 @@
+#!/usr/bin/env node
+// Runs the project's test script and passes its output through unchanged.
+// The generic parser reads the exit code and the output tail, so there is no
+// format to normalise — the only job here is to be inert when the project has
+// no tests, since a missing test script is not a failure.
+
+import { existsSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { join } from "node:path";
+
+const args = process.argv.slice(2);
+let project = process.cwd();
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === "--project" && args[i + 1]) project = args[++i];
+}
+
+const pkgPath = join(project, "package.json");
+if (!existsSync(pkgPath)) {
+  console.log("no package.json in this project; test check skipped");
+  process.exit(0);
+}
+let pkg;
+try {
+  pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+} catch (err) {
+  process.stderr.write(`package.json could not be read: ${err.message}\n`);
+  process.exit(1);
+}
+if (!pkg.scripts || !pkg.scripts.test) {
+  console.log("no test script in package.json; test check skipped");
+  process.exit(0);
+}
+
+const res = spawnSync("npm", ["test", "--silent"], {
+  cwd: project,
+  encoding: "utf8",
+  shell: false,
+});
+process.stdout.write(res.stdout ?? "");
+process.stderr.write(res.stderr ?? "");
+process.exit(res.status ?? 1);

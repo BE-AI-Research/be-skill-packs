@@ -1,0 +1,69 @@
+#!/usr/bin/env node
+// Runs ESLint and prints diagnostics in the shape BE-Code's msvc parser
+// reads: path(line,col): error RULE: message
+//
+// Why a wrapper at all: ESLint's default "stylish" format puts the filename
+// on a header line, which no line-based parser can read, and the two formats
+// that could be parsed (unix, compact) have been removed from core ESLint —
+// verified absent in 9.39.5 and 10.12.0 alike. Doing the conversion here
+// keeps ESLint's format churn inside the pack, where a pack author can fix
+// it, rather than inside the harness, where it would need a release.
+//
+// The rule name stands in for an error code, which gives playbook entries
+// something stable to match and signatures something stable to fingerprint.
+
+import { existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { relative, join, sep } from "node:path";
+
+const args = process.argv.slice(2);
+let project = process.cwd();
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === "--project" && args[i + 1]) project = args[++i];
+}
+
+const CONFIGS = [
+  "eslint.config.js",
+  "eslint.config.mjs",
+  "eslint.config.cjs",
+  "eslint.config.ts",
+  ".eslintrc",
+  ".eslintrc.js",
+  ".eslintrc.json",
+  ".eslintrc.cjs",
+];
+if (!CONFIGS.some((c) => existsSync(join(project, c)))) {
+  console.log("no eslint config in this project; lint check skipped");
+  process.exit(0);
+}
+
+// The project's own ESLint, not a fetched one: npx would reach for the
+// network when the dependency is missing, which turns a missing tool into a
+// hang instead of a clear failure.
+const local = join(project, "node_modules", ".bin", "eslint");
+const bin = existsSync(local) ? local : "npx";
+const argv = bin === "npx" ? ["eslint", "src", "--format", "json"] : ["src", "--format", "json"];
+
+const res = spawnSync(bin, argv, { cwd: project, encoding: "utf8", shell: false });
+
+let results;
+try {
+  results = JSON.parse(res.stdout);
+} catch {
+  // ESLint could not run — a bad config, a missing plugin. Pass its own
+  // complaint through untouched rather than inventing diagnostics.
+  process.stderr.write(res.stderr || res.stdout || "eslint produced no output\n");
+  process.exit(res.status === 0 ? 1 : (res.status ?? 1));
+}
+
+let errors = 0;
+for (const file of results) {
+  const rel = relative(project, file.filePath).split(sep).join("/");
+  for (const m of file.messages) {
+    if (m.severity !== 2) continue; // warnings must not fail the check
+    errors++;
+    const code = m.ruleId ?? "eslint";
+    console.log(`${rel}(${m.line ?? 1},${m.column ?? 1}): error ${code}: ${m.message}`);
+  }
+}
+process.exit(errors > 0 ? 1 : 0);
