@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "name": "ui-web",
+  "version": "0.1.0",
+  "description": "React and TypeScript interfaces: accessibility, state, effects and types",
+  "detect": { "all": ["package.json", "**/*.tsx"] },
+  "core": { "file": "core.md", "budget_tokens": 1500 },
+  "chunks": {},
+  "verify": [
+    {
+      "name": "types",
+      "cmd": ["npx", "tsc", "--noEmit", "--pretty", "false"],
+      "parser": "msvc",
+      "timeout": "5m",
+      "when": { "changed": ["src/**", "*.ts", "*.tsx", "package.json", "tsconfig.json"] }
+    },
+    {
+      "name": "lint",
+      "cmd": ["{pack}/tools/lint", "--project", "{workspace}"],
+      "parser": "msvc",
+      "timeout": "5m",
+      "when": { "changed": ["src/**", "*.ts", "*.tsx", "eslint.config.*"] }
+    },
+    {
+      "name": "test",
+      "cmd": ["{pack}/tools/test", "--project", "{workspace}"],
+      "parser": "generic",
+      "timeout": "10m",
+      "when": { "changed": ["src/**", "*.ts", "*.tsx"] }
+    }
+  ],
+  "playbooks": ["playbooks/errors.md"],
+  "commands": "commands",
+  "requires": { "be_code": ">=1.3.0" }
+}
