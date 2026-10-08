@@ -29,6 +29,29 @@ test("every chunk file exists and is under the 4 KiB floor", () => {
   }
 });
 
+// core.md tells the model to "fetch the chunk named in a playbook entry". That
+// promise is only true if every entry names one and every name resolves, so it
+// is a test rather than a convention.
+test("every playbook entry names a chunk that exists", () => {
+  const playbook = readFileSync(root + "playbooks/errors.md", "utf8");
+  const known = new Set(Object.keys(manifest.chunks ?? {}));
+  assert(known.size > 0, "no chunks registered");
+
+  // A reference is a backticked token that is exactly `ui-web/<name>`, which is
+  // what distinguishes it from a path like `fixtures/ui-web/captured/`.
+  const REF = /`ui-web\/([a-z0-9-]+)`/g;
+  for (const [, chunk] of playbook.matchAll(REF)) {
+    assert(known.has(chunk), `playbook points at ui-web/${chunk}, which is not in the manifest`);
+  }
+
+  // Entry bodies start at the "## " heading; the file's own header is not one.
+  const bodies = playbook.split(/^## /m).slice(1);
+  for (const body of bodies) {
+    const title = body.split("\n", 1)[0];
+    assert(new RegExp(REF.source).test(body), `entry "${title}" names no chunk`);
+  }
+});
+
 test("detection requires both a package manifest and a tsx file", () => {
   assert(manifest.detect.all.includes("package.json"), "missing package.json");
   assert(

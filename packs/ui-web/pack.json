@@ -5,7 +5,38 @@
   "description": "React and TypeScript interfaces: accessibility, state, effects and types",
   "detect": { "all": ["package.json", "**/*.tsx"] },
   "core": { "file": "core.md", "budget_tokens": 1500 },
-  "chunks": {},
+  "chunks": {
+    "a11y-semantics": {
+      "file": "chunks/a11y-semantics.md",
+      "summary": "elements before ARIA, accessible names, alt text, landmarks",
+      "triggers": ["aria-", "role=", "<img", "alt=", "onClick"]
+    },
+    "a11y-forms": {
+      "file": "chunks/a11y-forms.md",
+      "summary": "labels, grouping, required and invalid state, error association",
+      "triggers": ["<label", "<input", "<form", "htmlFor", "aria-describedby"]
+    },
+    "a11y-focus": {
+      "file": "chunks/a11y-focus.md",
+      "summary": "focus order and visibility, dialogs, keyboard interaction, live regions",
+      "triggers": ["tabIndex", "focus()", "role=\"dialog\"", "aria-live", "onKeyDown"]
+    },
+    "state": {
+      "file": "chunks/state.md",
+      "summary": "stored versus derived state, lifting, immutability, when to use context",
+      "triggers": ["useState", "useReducer", "useContext", "setState"]
+    },
+    "effects": {
+      "file": "chunks/effects.md",
+      "summary": "when an effect is wrong, dependencies, cleanup, fetch races",
+      "triggers": ["useEffect", "useLayoutEffect", "AbortController", "setTimeout"]
+    },
+    "types": {
+      "file": "chunks/types.md",
+      "summary": "props, children, generic components, event types, discriminated unions",
+      "triggers": ["React.FC", "ReactNode", "ChangeEvent", "PropsWithChildren", "as "]
+    }
+  },
   "verify": [
     {
       "name": "types",
