@@ -48,7 +48,7 @@ test("a workspace path containing spaces still yields relative paths", () => {
   writeFileSync(join(dir, "src", "Bad.tsx"), "const unused = 1;\nexport const x = 2;\n");
   const { out } = run(LINT, dir);
   assert(
-    /^src\/Bad\.tsx\(\d+,\d+\): error @typescript-eslint\/no-unused-vars:/m.test(out),
+    /^src\/Bad\.tsx\(\d+,\d+\): error ESL001: @typescript-eslint\/no-unused-vars:/m.test(out),
     out
   );
   assert(!out.includes("my project"), `path was not made relative: ${out}`);
@@ -88,7 +88,37 @@ test("a real violation is emitted in the documented shape", () => {
   writeFileSync(join(dir, "src", "NoAlt.tsx"), 'export const I = () => <img src="x.png" />;\n');
   const { out, code } = run(LINT, dir);
   assert(code !== 0, "a violation must fail the check");
-  assert(/^src\/NoAlt\.tsx\(\d+,\d+\): error jsx-a11y\/alt-text:/m.test(out), out);
+  assert(/^src\/NoAlt\.tsx\(\d+,\d+\): error ESL001: jsx-a11y\/alt-text:/m.test(out), out);
+});
+
+// The regex BE-Code's msvc parser actually applies, copied from
+// internal/verify/ubt.go (reMSVC). Checking our output against our own idea of
+// the shape is what let the first version of the wrapper ship a code the
+// parser could not read: every line fell through to "exit code 1 and no
+// recognisable error line", so the model got no diagnosis and no playbook
+// entry. If BE-Code ever loosens this pattern, this test is the thing to
+// update — deliberately, not by accident.
+const RE_MSVC =
+  /^\s*(?<file>.+?)\((?<line>\d+)(?:,(?<col>\d+))?\)\s*:\s*(?<sev>fatal error|error|warning)\s+(?<code>[A-Z]{1,3}\d{3,5})\s*:\s*(?<msg>.*)$/;
+
+test("every emitted line parses with the harness's own msvc pattern", () => {
+  const dir = scaffold(mkdtempSync(join(tmpdir(), "parse-")));
+  writeFileSync(
+    join(dir, "src", "Many.tsx"),
+    'export const I = () => <div><img src="x.png" /><a href="/y"></a></div>;\n',
+  );
+  const { out, code } = run(LINT, dir);
+  assert(code !== 0, "a violation must fail the check");
+
+  const lines = out.split("\n").filter((l) => l.trim() !== "");
+  assert(lines.length >= 2, `expected several diagnostics, got: ${out}`);
+  for (const line of lines) {
+    const m = RE_MSVC.exec(line);
+    assert(m, `the harness cannot parse this line:\n  ${line}`);
+    // The rule name has to survive into the message, because that is what a
+    // playbook entry matches on once the code is a constant.
+    assert(/^[a-z@][\w@/-]*:/.test(m.groups.msg), `no rule name in message: ${m.groups.msg}`);
+  }
 });
 
 test("the test wrapper is inert when the project has no test script", () => {

@@ -2,4 +2,4 @@ $ tsc --noEmit --pretty false   (exit 0)
 
 
 $ tools/lint   (exit 1)
-src/Broken.tsx(11,17): error react-hooks/rules-of-hooks: React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render.
+src/Broken.tsx(11,17): error ESL001: react-hooks/rules-of-hooks: React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render.

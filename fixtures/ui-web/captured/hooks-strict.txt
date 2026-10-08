@@ -1,5 +1,5 @@
 # captured with react-hooks/exhaustive-deps elevated from "warn" to "error";
 # a default project produces none of this.
 $ tools/lint   (exit 1)
-src/Broken.tsx(11,17): error react-hooks/rules-of-hooks: React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render.
-src/Broken.tsx(17,6): error react-hooks/exhaustive-deps: React Hook useEffect has a missing dependency: 'id'. Either include it or remove the dependency array. If 'setName' needs the current value of 'id', you can also switch to useReducer instead of useState and read 'id' in the reducer.
+src/Broken.tsx(11,17): error ESL001: react-hooks/rules-of-hooks: React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render.
+src/Broken.tsx(17,6): error ESL001: react-hooks/exhaustive-deps: React Hook useEffect has a missing dependency: 'id'. Either include it or remove the dependency array. If 'setName' needs the current value of 'id', you can also switch to useReducer instead of useState and read 'id' in the reducer.

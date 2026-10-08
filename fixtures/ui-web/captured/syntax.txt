@@ -4,4 +4,4 @@ src/Broken.tsx(3,1): error TS1381: Unexpected token. Did you mean `{'}'}` or `&r
 src/Broken.tsx(4,1): error TS1005: '</' expected.
 
 $ tools/lint   (exit 1)
-src/Broken.tsx(3,0): error eslint: Parsing error: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+src/Broken.tsx(3,0): error ESL001: eslint: Parsing error: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?

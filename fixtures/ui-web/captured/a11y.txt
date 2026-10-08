@@ -2,8 +2,8 @@ $ tsc --noEmit --pretty false   (exit 0)
 
 
 $ tools/lint   (exit 1)
-src/Broken.tsx(13,7): error jsx-a11y/alt-text: img elements must have an alt prop, either with meaningful text, or an empty string for decorative images.
-src/Broken.tsx(15,7): error jsx-a11y/label-has-associated-control: A form label must be associated with a control.
-src/Broken.tsx(17,7): error jsx-a11y/anchor-has-content: Anchors must have content and the content must be accessible by a screen reader.
-src/Broken.tsx(18,7): error jsx-a11y/click-events-have-key-events: Visible, non-interactive elements with click handlers must have at least one keyboard listener.
-src/Broken.tsx(18,7): error jsx-a11y/no-static-element-interactions: Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.
+src/Broken.tsx(13,7): error ESL001: jsx-a11y/alt-text: img elements must have an alt prop, either with meaningful text, or an empty string for decorative images.
+src/Broken.tsx(15,7): error ESL001: jsx-a11y/label-has-associated-control: A form label must be associated with a control.
+src/Broken.tsx(17,7): error ESL001: jsx-a11y/anchor-has-content: Anchors must have content and the content must be accessible by a screen reader.
+src/Broken.tsx(18,7): error ESL001: jsx-a11y/click-events-have-key-events: Visible, non-interactive elements with click handlers must have at least one keyboard listener.
+src/Broken.tsx(18,7): error ESL001: jsx-a11y/no-static-element-interactions: Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.

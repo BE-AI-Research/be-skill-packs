@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Runs ESLint and prints diagnostics in the shape BE-Code's msvc parser
-// reads: path(line,col): error RULE: message
+// reads: path(line,col): error ESL001: RULE: message
 //
 // Why a wrapper at all: ESLint's default "stylish" format puts the filename
 // on a header line, which no line-based parser can read, and the two formats
@@ -9,8 +9,18 @@
 // keeps ESLint's format churn inside the pack, where a pack author can fix
 // it, rather than inside the harness, where it would need a release.
 //
-// The rule name stands in for an error code, which gives playbook entries
-// something stable to match and signatures something stable to fingerprint.
+// Why the constant ESL001 rather than the rule name as the code: the parser's
+// code group is `[A-Z]{1,3}\d{3,5}` (internal/verify/ubt.go, reMSVC), which
+// `TS18048` satisfies and `jsx-a11y/alt-text` cannot. The first version of
+// this wrapper put the rule name there, every line failed to parse, and a
+// failing lint check reached the model as "exit code 1 and no recognisable
+// error line" — no diagnosis, no signature, and no playbook entry, found only
+// by running the real harness against the real pack.
+//
+// The rule name therefore leads the message instead, where playbook entries
+// still match it: a match is tried against the raw line as well as the
+// message. The code is constant across rules, and the anti-loop signature
+// stays distinct because it also covers the normalised message.
 
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -63,7 +73,7 @@ for (const file of results) {
     if (m.severity !== 2) continue; // warnings must not fail the check
     errors++;
     const code = m.ruleId ?? "eslint";
-    console.log(`${rel}(${m.line ?? 1},${m.column ?? 1}): error ${code}: ${m.message}`);
+    console.log(`${rel}(${m.line ?? 1},${m.column ?? 1}): error ESL001: ${code}: ${m.message}`);
   }
 }
 process.exit(errors > 0 ? 1 : 0);
