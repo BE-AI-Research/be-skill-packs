@@ -170,24 +170,50 @@ Later, if evals show demand: `forms-ux`, `performance`, `testing`, `data`.
 
 ### 5.3 Playbook
 
-Keyed on the code or rule name the diagnostic already carries, frequency
-first:
+**Entries are chosen and ordered by how uninformative the diagnostic is, not
+by how often it occurs.** Curated guidance pays where the tool's own message
+does not already name the fix; where it does, the model is near ceiling
+already and an entry adds little. `TS2322: Type 'number' is not assignable to
+type 'string'` is nearly self-explaining. `react-hooks/exhaustive-deps` is the
+opposite: the obvious fix causes a render loop, so the entry is worth more
+than the message.
 
-**Accessibility** (when lint is present) — the four of the six most common
-failures that static analysis can catch: `alt-text`,
-`label-has-associated-control`, `anchor-has-content`,
-`control-has-associated-label`.
+(Frequency still governs §5.1. Core prevents; the playbook routes. They are
+ordered by different things on purpose.)
 
-**TypeScript** — `TS2322` assignability, `TS2739`/`TS2741` missing props,
-`TS18048`/`TS2531` possibly undefined, `TS7006` implicit any on a handler,
-`TS2769` no overload matches (usually a handler signature).
+Highest information gap first:
 
-**React** — `rules-of-hooks`, `exhaustive-deps`, `jsx-key`.
+1. `react-hooks/exhaustive-deps` — the obvious fix is wrong
+2. `jsx-a11y/click-events-have-key-events` / `no-static-element-interactions` —
+   the message names a rule, not the remedy (use a different element)
+3. `react-hooks/rules-of-hooks` — the message says what is wrong, not why
+   order matters or how to restructure
+4. `jsx-a11y/label-has-associated-control` — "add a label" is implied but the
+   `htmlFor`/`id` pairing and the placeholder trap are not
+5. `jsx-a11y/alt-text` — mostly self-explaining; the entry exists for the
+   decorative `alt=""` distinction
+6. `TS18048`/`TS2532` possibly undefined — the message is clear; the entry
+   exists to stop `!` being used to silence it
+7. `react/jsx-key` — self-explaining except for why the index is wrong
+8. `TS2322`/`TS2739`/`TS2741` prop mismatch — most self-explaining of the set;
+   the entry exists only to stop the type being widened to make it pass
 
-Then a catch-all (`match: .`).
+**No catch-all.** This reverses the shape the ue5 pack uses. A `match: .`
+entry matches every unrecognised failure and therefore injects generic advice
+on all of them — and generic guidance measures *worse than the raw compiler
+message* (FeedbackEval: LLM-Skilled 48.8% against raw compiler 49.2%), while
+prompt effectiveness is non-monotonic in the number of facts supplied, with
+bug-specific selection beating the best generic configuration by 17%
+(arXiv 2404.05520). An unmatched failure should therefore reach the model as
+the parsed diagnostic alone. One gated, confident entry — or none.
 
-`exhaustive-deps` is the entry that justifies the format, because the obvious
-fix is the wrong one:
+**`cause` is a discriminator, not an explanation.** One sentence whose job is
+to tell the model which situation it is in, so it can act. Explanation belongs
+in the chunk, which the entry can point at. The clearest form found in public
+practice uses exactly this split — a middle column holding a minimal
+discriminator rather than a cause.
+
+`exhaustive-deps` is the entry that justifies the format:
 
 ```markdown
 ## react-hooks/exhaustive-deps
@@ -205,12 +231,39 @@ next: If adding the dependency caused an infinite loop, the value is recreated
   do not silence the rule.
 ```
 
-A model told the same error twice will repeat its edit; here that edit causes
-a render loop. `next` is what catches it on the second pass.
-
 **Every entry is written from captured output**, from the fixture project of
 §7 — not from memory of what these tools say. A playbook written from
 documentation is a guess.
+
+### 5.4 Why the repeat step is built this way
+
+The escalation is not decoration, and the research says more about it than
+about anything else in this design.
+
+Appending a failed action and its error to the transcript makes a small model
+**more** likely to repeat that action verbatim — exact-repeat rate 0% to 19%,
+with **83% of the effect coming from the failed action's surface form merely
+being present in context**, not from it being marked as failed
+(arXiv 2608.23651). The rule the authors state is almost this design: *the
+context after a failure must differ from the context before it, and the
+difference must not be the failed action itself.* Withholding `fix` and
+substituting `next` on a repeat is exactly such a difference.
+
+Three consequences, all load-bearing:
+
+- **A prose instruction not to repeat has no measurable effect.** The
+  mechanism must be the injected difference. Nothing in core or a chunk can
+  do this job.
+- **The failed attempt must not be deleted from history** — removing it took
+  loop rates from 29% to 67%, far worse than leaving it.
+- **Two repair rounds capture 76–95% of achievable gains**
+  (arXiv 2604.10508), so the second failure is where the remaining headroom
+  is, which is where the `next` step fires.
+
+The caveat is sharp and in our favour as a reason to measure: the models
+studied were 135M–1.7B, with an extrapolated crossover near 37.6B that the
+authors call unreliable. This should bite hardest on exactly the small local
+models this harness exists for, and may be weak on frontier ones.
 
 ## 6. Evidence, and the limits of it
 
@@ -228,6 +281,21 @@ consensus. The one empirical study found concerns bugs in the TypeScript
 compiler, not errors developers encounter. Assignability, missing properties,
 null/undefined and implicit `any` are consistently reported as the common set,
 and the fixture project of §7 will give us our own ordering.
+
+**Contested — and it is this pack's core premise.** Whether curated guidance
+beats the raw error message is unsettled. FeedbackEval ranks mixed feedback
+above expert above test above compiler; but its "expert" feedback was
+generated with access to the correct code, and an independent replication
+(arXiv 2609.00362) found human-written feedback ranked *lowest* in Python,
+with compiler feedback statistically indistinguishable from simple feedback on
+compiler mutations. This is the reason §5.3 selects entries by information gap:
+it concentrates the pack where the premise is most likely to hold.
+
+**Unstudied.** No controlled study of escalation in agent instructions exists.
+Counting attempts and stopping at two or three is common practice; specifying
+what to try *instead* on the second attempt is nearly absent from public
+practice. The evals (§8) must therefore exercise the repeat path, not only
+first-failure fixes — we are measuring something nobody has published on.
 
 **Known ceilings**, to be stated in the pack's own README rather than implied
 away:
@@ -264,6 +332,13 @@ Tasks derived from the playbook entries and the six accessibility failures,
 each run with the pack off and on, against a small local model and a frontier
 model. Recorded per run: whether the checks pass, repair rounds, turns, tokens.
 
+**At least one task must exercise the repeat path** — a failure whose obvious
+fix does not work, so the second round is reached and the `next` step fires.
+That is the part of this design no published study covers (§6), so it is the
+part we have to measure ourselves. Record whether the second attempt differed
+from the first at all, which is the behaviour arXiv 2608.23651 predicts will
+fail without an injected difference.
+
 The pack is worth shipping when the small model with it closes a meaningful
 part of the gap to the frontier model without it. A pack that only helps a
 frontier model has not earned its context.
@@ -287,3 +362,8 @@ frontier model has not earned its context.
 - `when.exists` in the format, which would replace the wrappers' self-skip.
 - `verify.commands` in BE-Code config, which would resolve §6's interaction.
 - Pack dependencies, for when `ui-core` exists.
+- A harness correction, not a pack change: BE-Code's third-rung message asks
+  the model not to repeat its advice. A prose instruction of that kind has no
+  measurable effect (arXiv 2608.23651); the rung should change the context
+  instead, which the `auto:verify` consultation already does. Worth tidying
+  when next in that file.

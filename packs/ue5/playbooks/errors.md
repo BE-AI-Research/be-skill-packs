@@ -5,6 +5,12 @@ against the diagnostic's raw line and message; the first matching entry in
 file order wins, so specific entries come before general ones. `fix` is shown
 on the first failure, `next` when the same failure signature comes back.
 
+There is deliberately **no catch-all** (`match: .`). It would fire on every
+unrecognised failure, and generic guidance measures worse than the raw
+compiler message — an unmatched diagnostic is better off reaching the model
+on its own. Entries here are worth most where UBT's own message is least
+useful.
+
 ## Live Coding lock
 match: Unable to build while Live Coding is active
 kind: tool
@@ -131,11 +137,3 @@ cause: The `.uproject` enables a plugin that is not installed for this engine or
 fix:
 1. Tell the user which plugin is missing. Do not delete it from the `.uproject` unless they say so; content may depend on it.
 next: If the user confirms it is unused, set `"Enabled": false` for it in the `.uproject`.
-
-## Unknown failure
-match: .
-kind: any
-cause: No specific entry matched.
-fix:
-1. Read the first error line carefully, fix that one thing only, rebuild.
-next: Fetch the most relevant chunk with the `pack` tool before trying again; do not repeat the previous change.
