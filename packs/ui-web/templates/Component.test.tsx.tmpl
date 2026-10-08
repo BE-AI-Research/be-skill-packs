@@ -1,0 +1,13 @@
+// @vitest-environment jsdom
+// test and expect are imported, not assumed: vitest provides them as globals
+// only when the project sets `globals: true`, and most do not.
+import { test, expect } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { {{NAME}} } from "./{{NAME}}";
+
+test("{{NAME}} is reachable by its accessible name", () => {
+  render(<{{NAME}} />);
+  // Query by role and name, never by test id: if this query cannot find the
+  // element, a screen reader cannot either.
+  expect(screen.getByRole("TODO", { name: "TODO" })).toBeDefined();
+});
