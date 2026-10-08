@@ -1,0 +1,7 @@
+$ tsc --noEmit --pretty false   (exit 2)
+src/Broken.tsx(2,11): error TS17008: JSX element 'p' has no corresponding closing tag.
+src/Broken.tsx(3,1): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+src/Broken.tsx(4,1): error TS1005: '</' expected.
+
+$ tools/lint   (exit 1)
+src/Broken.tsx(3,0): error eslint: Parsing error: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
