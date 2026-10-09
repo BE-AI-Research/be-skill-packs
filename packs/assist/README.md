@@ -96,5 +96,32 @@ prevent. If you would rather not grant it, drop the schedule and run
 `/assist-brief` by hand instead; the log still works when you are there to
 approve the write.
 
+## The one thing to set before running it unattended
+
+**Set `verify_on_done: false` in the workspace you run the brief in, or accept
+that a brief can turn into a repair session.**
+
+This was found by running it for real, not by reading the code. The brief
+appends to its log, and that is a file write; BE-Code runs the project's
+verification after any request that could have changed files, and
+`changedFiles()` does not exempt the harness's own `.be-code/` directory. So a
+brief in a repository whose suite is red — or merely flaky under load — comes
+back `verification failed (go test); repair attempt 1/N` and the assistant goes
+off reading and editing source to fix a test it never touched. With
+`max_repairs` set high and `-y` approving writes, that runs for a long time.
+
+Everything the pack's rules say about withholding and about decisions that are
+not yours is still true of the brief itself. The repair loop arrives *after*
+the brief, from the harness, and no wording in a pack can prevent it.
+
+```json
+{ "verify_on_done": false }
+```
+
+Two other options, both worse: leave `verify_on_done` on and keep the suite
+green, which makes the brief's cost the suite's runtime every morning; or drop
+the `write: .be-code/assist` grant, which stops the write and with it the
+escalation rule.
+
 `.be-code/` is already in your project's `.gitignore` if BE-Code has ever
 written a task document there, so the log is untracked by default.
