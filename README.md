@@ -16,6 +16,7 @@ code somebody else wrote into your agent's process.
 
 | Pack | What it knows | State |
 |---|---|---|
+| [`packs/assist`](packs/assist) | A personal assistant over the state of the work: git, task documents, the changelog. Facts come from a scan script; judgement comes from core's rules, whose spine is withholding | 0.1.0 — seed. Switched on by hand, never detected. No test state, no outward action; phase 2 (mail, calendar) waits on pack-declared MCP servers |
 | [`packs/ue5`](packs/ue5) | Unreal Engine 5 C++: reflection and UHT, modules and `.Build.cs`, object lifetime, replication, building with UnrealBuildTool, and 15 playbook entries for the errors that stop a build | 0.1.0 — seed. Two chunks of a planned nine; never yet run against a real engine |
 | [`packs/ui-web`](packs/ui-web) | React + TypeScript interfaces: accessibility ordered by measured real-world frequency, state, effects, types. Eight playbook entries, every one written from captured toolchain output rather than from a rule's documentation | 0.1.0 — seed. Six chunks; contrast, empty buttons and unlabelled inputs are rules rather than checks, because no standard lint config catches them |
 

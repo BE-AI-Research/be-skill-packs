@@ -224,13 +224,24 @@ The implementer checks that against `internal/schedule`'s own parser
 in the README — a README that ships a line which does not parse is worse than
 one that describes the shape and says to run `/schedule add --help`.
 
+**Corrected during implementation (2026-10-09).** The line above is a guess
+and the harness rejects it. `ParseScheduleAdd` requires a name, a ` -- `
+before the instruction, and one `allow` clause whose grants are separated by
+`;`; and a `write:` grant is a path prefix, not a glob — `WriteAllowed`
+compares prefixes, so `write: .be-code/assist/**` parses and then covers
+nothing. The verified form, which `packs/assist/README.md` carries:
+
+```
+/schedule add brief weekdays 08:00 -- /assist-brief allow shell: node */packs/assist/tools/scan*; write: .be-code/assist; write: .be-code/tasks; write: CHANGELOG.md
+```
+
 The brief then runs unattended, and because a fired turn gates every tool
 call, it needs these standing grants:
 
 ```
 shell: node */packs/assist/tools/scan*
-write: .be-code/assist/**
-write: .be-code/tasks/**
+write: .be-code/assist
+write: .be-code/tasks
 write: CHANGELOG.md
 ```
 
