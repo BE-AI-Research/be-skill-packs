@@ -1,6 +1,6 @@
 Say whether a release is ready, and what remains. $ARGS
 
-1. Run the scan: `node {pack}/tools/scan --project .` The changelog, version
+1. Run the scan: `node "{pack}/tools/scan" --project .` The changelog, version
    and tag facts come from its `change` line and nowhere else.
 2. Fetch `pack assist/release`.
 3. Report the state exactly as the scan gives it. If it says

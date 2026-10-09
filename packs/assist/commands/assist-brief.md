@@ -1,6 +1,6 @@
 Give the morning brief. $ARGS
 
-1. Run the scan and read all of it: `node {pack}/tools/scan --project .`
+1. Run the scan and read all of it: `node "{pack}/tools/scan" --project .`
    Everything you say about this workspace comes from that output. If the
    `notes` line says something could not be read, say so — do not fill the
    gap from memory.

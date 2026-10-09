@@ -225,15 +225,26 @@ in the README — a README that ships a line which does not parse is worse than
 one that describes the shape and says to run `/schedule add --help`.
 
 **Corrected during implementation (2026-10-09).** The line above is a guess
-and the harness rejects it. `ParseScheduleAdd` requires a name, a ` -- `
-before the instruction, and one `allow` clause whose grants are separated by
-`;`; and a `write:` grant is a path prefix, not a glob — `WriteAllowed`
-compares prefixes, so `write: .be-code/assist/**` parses and then covers
-nothing. The verified form, which `packs/assist/README.md` carries:
+and wrong in four ways; `packs/assist/README.md` carries the form that works
+and the reasoning. In short:
 
-```
-/schedule add brief weekdays 08:00 -- /assist-brief allow shell: node */packs/assist/tools/scan*; write: .be-code/assist; write: .be-code/tasks; write: CHANGELOG.md
-```
+1. `ParseScheduleAdd` requires a schedule **name** before the `when`.
+2. It requires ` -- ` between the `when` and the instruction.
+3. Only the **last** ` allow ` clause is read, its grants split on `;`, so a
+   clause per grant silently drops all but one.
+4. A `write:` grant is a path **prefix**, not a glob — `WriteAllowed` compares
+   prefixes and only `browser:`/`tool:` use `path.Match` — so
+   `write: .be-code/assist/**` parses and then covers nothing.
+
+And one thing this section got wrong at the design level, found by the final
+review rather than by the syntax check: **a schedule's instruction is sent to
+the model as plain text, and slash commands are not expanded.** The harness
+expands a custom command only on the TUI's submit path and the plain REPL's;
+a fired schedule reaches `RunFull` without passing either. So scheduling
+`/assist-brief` delivers those six characters and runs nothing — no scan, no
+log, and none of the grants used for their purpose. The scheduled brief's
+instruction has to be written inline, repeating what the command body says,
+and the README does that.
 
 The brief then runs unattended, and because a fired turn gates every tool
 call, it needs these standing grants:

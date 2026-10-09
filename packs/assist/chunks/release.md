@@ -24,6 +24,8 @@ whether they match. Read them together:
 | `matches=yes`, `unreleased=empty` | Everything released. Nothing to raise. |
 | `matches=no` | **Raise it now, not in the brief.** Either a release was tagged and the version never bumped, or the version was bumped and never tagged. Both mislead anyone reading the repository. |
 | `version=unknown` | The scan found no version source. Say so; do not guess one from the tag. |
+| `latest-tag=none` | Nothing has been released yet, so there is no `matches` field and nothing to compare. Common, and not a problem. |
+| `unreleased=absent` | The changelog has no Unreleased section at all. Say so once; it is a convention this project does not use, not a fault. |
 
 A mismatch is the one release fact that interrupts. Everything else waits.
 
@@ -39,6 +41,10 @@ command is. The decision is the person's every time.
 change  unreleased=6-entries version=1.2.5 latest-tag=v1.2.5 matches=yes
 git     branch=main upstream=origin/main ahead=15 behind=0 dirty=0
 ```
+
+These are an example's numbers. Read every figure from the scan you ran, never
+from this page — a brief that quotes "15 commits unpushed" because it appeared
+here is exactly the confident wrong brief the core rules forbid.
 
 > **Ready to release, with two things outstanding.** Six Unreleased entries,
 > version and tag agree at 1.2.5, working tree clean.

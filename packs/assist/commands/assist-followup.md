@@ -1,6 +1,6 @@
 What is outstanding, and what has already been said? $ARGS
 
-1. Run the scan: `node {pack}/tools/scan --project .`
+1. Run the scan: `node "{pack}/tools/scan" --project .`
 2. Read `.be-code/assist/brief-log.md`. If it does not exist, say so — a
    missing log and a fortnight with nothing raised look identical otherwise,
    and only one of them means the escalation rule is working.

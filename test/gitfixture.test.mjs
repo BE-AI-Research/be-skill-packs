@@ -1,5 +1,5 @@
 import { test, assert } from "./run.mjs";
-import { makeRepo, gitOut } from "./gitfixture.mjs";
+import { makeRepo, gitOut, cleanupFixtures } from "./gitfixture.mjs";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -31,4 +31,14 @@ test("task documents and a changelog are written where the harness expects", () 
   });
   assert(existsSync(join(dir, ".be-code", "tasks", "001-first.md")), "no task doc");
   assert(existsSync(join(dir, "CHANGELOG.md")), "no changelog");
+});
+
+test("fixtures are removed when the test process exits", () => {
+  const dir = makeRepo({ commits: 1 });
+  assert(existsSync(dir), "fixture was not created");
+  cleanupFixtures();
+  assert(
+    !existsSync(dir),
+    "every fixture is a real git repository in a temp directory; leaving them behind grew to 822 directories and 184 MB of /tmp across one session's runs",
+  );
 });

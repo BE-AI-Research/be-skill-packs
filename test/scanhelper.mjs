@@ -9,10 +9,13 @@ import { execFileSync } from "node:child_process";
 
 const SCAN = new URL("../packs/assist/tools/scan", import.meta.url).pathname;
 
-export function scan(dir, extra = []) {
+// env overrides go to the child, so a test can run the scan with no git on
+// PATH — the one way to tell "no git binary" from "not a repository".
+export function scan(dir, extra = [], env = undefined) {
+  const argv = dir === null ? [SCAN, ...extra] : [SCAN, "--project", dir, ...extra];
   try {
     return {
-      out: execFileSync("node", [SCAN, "--project", dir, ...extra], { encoding: "utf8" }),
+      out: execFileSync("node", argv, { encoding: "utf8", env: env ?? process.env }),
       code: 0,
     };
   } catch (err) {

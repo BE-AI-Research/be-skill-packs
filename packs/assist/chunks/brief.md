@@ -5,8 +5,8 @@ is true does not matter this morning.
 
 ## Order by what blocks what
 
-Not by when it happened — the scan is already in its own order and a brief
-that repeats it is a log. Ask of each item: does anything the person plans to
+Not by when it happened. The scan reports by section rather than by time, and
+a brief that just walks its sections in order is a log. Ask of each item: does anything the person plans to
 do today run into this? Those come first. Then what expires. Then what was
 owed to somebody else and is late. Everything else is probably not an item.
 
@@ -31,7 +31,7 @@ A scan with eight observations in it:
 ```
 git     branch=main upstream=origin/main ahead=15 behind=0 dirty=0
 git     stale-branches=6 fix/ghost-rows(merged) fix/console(merged) …
-tasks   dir=.be-code/tasks count=7 doing=003 todo=4 blocked=1 stale>14d=2(001,004)
+tasks   dir=.be-code/tasks count=7 doing=003 todo=3 active=1 done=2 blocked=1 dropped=0 stale>14d=2(001,004)
 change  unreleased=6-entries version=1.2.5 latest-tag=v1.2.5 matches=yes
 notes   (none)
 ```

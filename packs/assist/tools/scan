@@ -14,12 +14,20 @@ import { join, resolve } from "node:path";
 const args = process.argv.slice(2);
 let project = process.cwd();
 let staleDays = 14;
+function usage(why) {
+  process.stderr.write(`scan: ${why}\nusage: scan [--project <dir>] [--stale-days <n>]\n`);
+  process.exit(2);
+}
+// An unrecognised flag is refused rather than ignored. Ignoring it means a
+// typo like --projetc=/elsewhere reports the *current* directory under a
+// header nobody reads, which is a brief about the wrong repository.
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
   if (a === "--project" && args[i + 1]) project = args[++i];
   else if (a.startsWith("--project=")) project = a.slice("--project=".length);
   else if (a === "--stale-days" && args[i + 1]) staleDays = Number(args[++i]);
   else if (a.startsWith("--stale-days=")) staleDays = Number(a.slice("--stale-days=".length));
+  else usage(`unrecognised argument ${JSON.stringify(a)}`);
 }
 // Resolved to an absolute path before anything uses it. A relative
 // --project (". " is the natural one, and what the commands pass) made relOf
@@ -28,10 +36,7 @@ for (let i = 0; i < args.length; i++) {
 // that does not exist. It also makes the header's workspace= worth reading.
 project = resolve(project);
 
-if (!Number.isFinite(staleDays) || staleDays < 0) {
-  process.stderr.write("usage: scan --project <dir> [--stale-days <n>]\n");
-  process.exit(2);
-}
+if (!Number.isFinite(staleDays) || staleDays < 0) usage(`--stale-days must be a non-negative number`);
 
 const notes = [];
 const lines = [];
@@ -54,10 +59,30 @@ function relOf(p) {
   return p.startsWith(project) ? p.slice(project.length).replace(/^[/\\]/, "") : p;
 }
 
+// A workspace that is not there is not an empty one, and reporting four
+// absences for a mistyped path is four wrong facts.
+const projectExists = existsSync(project);
+if (!projectExists) notes.push(`workspace ${project} does not exist; nothing could be read`);
+
+// Without git, nothing below can be read either — but "not a git repository"
+// would be a claim about the directory rather than about the machine.
+const haveGit = projectExists && git(["--version"]) !== null;
+if (projectExists && !haveGit) notes.push("git is not on PATH; no branch, unpushed or branch facts");
+
+// Lists are cut, counts never are: a truncated list beside a true number is
+// useful, a shortened number is a lie. One helper so both lists agree.
+const LIST_CAP = 8;
+function capList(items) {
+  if (items.length <= LIST_CAP) return items.join(",");
+  return `${items.slice(0, LIST_CAP).join(",")},+${items.length - LIST_CAP} more`;
+}
+
 const isRepo =
-  existsSync(join(project, ".git")) && git(["rev-parse", "--is-inside-work-tree"]) === "true";
+  haveGit &&
+  existsSync(join(project, ".git")) &&
+  git(["rev-parse", "--is-inside-work-tree"]) === "true";
 if (!isRepo) {
-  notes.push("not a git repository; no branch, unpushed or branch facts");
+  if (haveGit) notes.push("not a git repository; no branch, unpushed or branch facts");
 } else {
   const branch = git(["rev-parse", "--abbrev-ref", "HEAD"]);
   const detached = branch === "HEAD" || branch === null;
@@ -99,7 +124,13 @@ entries = entries.filter((f) => !/\.broken-\d/.test(f));
 if (entries.length === 0) {
   notes.push(`no task documents in ${relOf(tasksDir)}`);
 } else {
-  let blocked = 0;
+  // A document's status is its root's mark, read rather than inferred. The
+  // engine writes one root per document whose id is the document's number,
+  // with steps nested beneath; deriving todo as "count minus the others" said
+  // three finished documents were outstanding.
+  const MARKS = { " ": "todo", ">": "active", x: "done", "!": "blocked", "-": "dropped" };
+  const by = { todo: 0, active: 0, done: 0, blocked: 0, dropped: 0 };
+  let counted = 0;
   let doing = null;
   const stale = [];
   const cutoff = Date.now() - staleDays * 86400000;
@@ -113,24 +144,36 @@ if (entries.length === 0) {
       notes.push(`task document ${f} could not be read`);
       continue;
     }
+    // The root is the first unindented checklist line. A document with none
+    // is named on notes and left out of every count: a document the scan
+    // cannot classify is one it cannot report on.
+    const root = body.match(/^- \[(.)\] /m);
+    const status = root ? MARKS[root[1].toLowerCase() === "x" ? "x" : root[1]] : undefined;
+    if (!status) {
+      notes.push(`task document ${f} has no recognisable root line; not counted`);
+      continue;
+    }
+    counted++;
+    by[status]++;
     if (/^\s*- \[>\]/m.test(body) && doing === null) doing = id;
-    if (/^\s*- \[!\]/m.test(body)) blocked++;
     try {
       if (statSync(full).mtimeMs < cutoff) stale.push(id);
     } catch {
-      /* counted above */
+      /* named on notes above */
     }
   }
-  const todo = entries.length - (doing ? 1 : 0) - blocked;
   const parts = [
     `dir=${relOf(tasksDir)}`,
-    `count=${entries.length}`,
+    `count=${counted}`,
     `doing=${doing ?? "none"}`,
-    `todo=${todo < 0 ? 0 : todo}`,
-    `blocked=${blocked}`,
-    `stale>${staleDays}d=${stale.length}` + (stale.length ? `(${stale.join(",")})` : ""),
+    `todo=${by.todo}`,
+    `active=${by.active}`,
+    `done=${by.done}`,
+    `blocked=${by.blocked}`,
+    `dropped=${by.dropped}`,
+    `stale>${staleDays}d=${stale.length}` + (stale.length ? `(${capList(stale)})` : ""),
   ];
-  lines.push(`tasks   ${parts.join(" ")}`);
+  if (counted > 0) lines.push(`tasks   ${parts.join(" ")}`);
 }
 
 // The changelog's Unreleased section, and the version. An empty Unreleased
@@ -140,11 +183,15 @@ const clPath = join(project, "CHANGELOG.md");
 const changeParts = [];
 try {
   const cl = readFileSync(clPath, "utf8");
-  const m = cl.match(/^##\s+Unreleased\s*$([\s\S]*?)(?=^##\s|$(?![\s\S]))/m);
+  // "## [Unreleased]" is Keep a Changelog's own heading and the most common
+  // one; reading only the bare form reported a populated section as absent.
+  const m = cl.match(/^##\s+\[?Unreleased\]?\s*$([\s\S]*?)(?=^##\s|$(?![\s\S]))/m);
   if (!m) {
     changeParts.push("unreleased=absent");
   } else {
-    const n = (m[1].match(/^-\s+\*\*/gm) ?? []).length;
+    // Any bullet counts. Counting only "- **" assumed this project's own
+    // convention and called everyone else's populated section empty.
+    const n = (m[1].match(/^\s*[-*]\s+\S/gm) ?? []).length;
     changeParts.push(n === 0 ? "unreleased=empty" : `unreleased=${n}-entries`);
   }
 } catch {
@@ -172,7 +219,14 @@ for (const f of tryVersion) {
 }
 if (changeParts.length > 0 || version) {
   changeParts.push(`version=${version ?? "unknown"}`);
-  const tag = isRepo ? git(["describe", "--tags", "--abbrev=0"]) : null;
+  // The repository's latest tag by version order. "describe --abbrev=0"
+  // answers a different question — the nearest tag *reachable from HEAD* —
+  // so on any branch cut before the latest release it reported an older tag
+  // and produced matches=no, a mismatch that does not exist, on the one
+  // channel core.md allows to interrupt.
+  const tag = isRepo
+    ? git(["for-each-ref", "--sort=-v:refname", "--count=1", "--format=%(refname:short)", "refs/tags"]) || null
+    : null;
   changeParts.push(`latest-tag=${tag ?? "none"}`);
   if (version && tag) changeParts.push(`matches=${tag.replace(/^v/, "") === version ? "yes" : "no"}`);
   lines.push(`change  ${changeParts.join(" ")}`);
@@ -182,10 +236,25 @@ if (!version) notes.push("no version found in package.json, build.mk or VERSION"
 // Stale local branches. Merged into the default branch is safe to delete;
 // merely old is not, so the two are distinguished rather than lumped.
 if (isRepo) {
-  const head = git(["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]);
-  const base = head && git(["rev-parse", "--verify", "--quiet", head]) ? head : "main";
+  // origin/HEAD exists after a clone but not after "git remote add", so the
+  // fallback is the common path. Guessing "main" meant a master repository's
+  // merged branches were invisible to every brief, and master itself was
+  // reported as a stale branch — both read wrongly rather than noted.
+  const exists = (ref) => (ref ? git(["rev-parse", "--verify", "--quiet", ref]) : null);
+  const originHead = git(["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]);
+  let base = exists(originHead) ? originHead : null;
+  if (!base) {
+    const configured = git(["config", "init.defaultBranch"]);
+    for (const c of [configured, "main", "master", "trunk"]) {
+      if (c && exists(c)) {
+        base = c;
+        break;
+      }
+    }
+  }
+  if (!base) notes.push("could not determine the default branch; merged branches not reported");
   const merged = new Set(
-    (git(["branch", "--format=%(refname:short)", "--merged", base]) ?? "").split("\n").filter(Boolean),
+    base ? (git(["branch", "--format=%(refname:short)", "--merged", base]) ?? "").split("\n").filter(Boolean) : [],
   );
   const all = (git(["for-each-ref", "--format=%(refname:short)\t%(committerdate:unix)", "refs/heads"]) ?? "")
     .split("\n")
@@ -197,31 +266,44 @@ if (isRepo) {
   const current = git(["rev-parse", "--abbrev-ref", "HEAD"]);
   const oldCutoff = Date.now() / 1000 - 30 * 86400;
   const staleBranches = all
-    .filter((b) => b.name !== current && b.name !== base.replace(/^origin\//, ""))
+    .filter((b) => b.name !== current && b.name !== (base ?? "").replace(/^origin\//, ""))
     .map((b) => (merged.has(b.name) ? { ...b, why: "merged" } : b.when < oldCutoff ? { ...b, why: "old" } : null))
     .filter(Boolean);
   if (staleBranches.length > 0) {
-    const shown = staleBranches.slice(0, 8).map((b) => `${b.name}(${b.why})`).join(" ");
-    const more = staleBranches.length > 8 ? ` +${staleBranches.length - 8} more` : "";
-    lines.push(`git     stale-branches=${staleBranches.length} ${shown}${more}`);
+    lines.push(
+      `git     stale-branches=${staleBranches.length} ` +
+        capList(staleBranches.map((b) => `${b.name}(${b.why})`)).replace(/,/g, " "),
+    );
   }
 }
 
-// The ceiling bounds the report so a repository with three hundred branches
-// cannot crowd out everything else. Only the lists are cut, never the counts:
-// a truncated list beside a true number is useful, a shortened number is a lie.
-const MAX_LINES = 60;
+// The ceiling bounds the report so a repository with three hundred documents
+// cannot crowd out everything else. It is measured in bytes, because that is
+// what the exposure is: a tool result is capped at 4 KiB in the harness, so a
+// line budget bounded the wrong quantity and, with every list capped, could
+// never fire at all. Only lists are cut, never counts: a truncated list
+// beside a true number is useful, a shortened number is a lie.
+const MAX_BYTES = 3500;
+const NOTE_CAP = 6;
 
 function emit() {
   const header = `# assist scan  ${new Date().toISOString()}  workspace=${project}`;
   const body = lines.slice();
-  body.push(`notes   ${notes.length === 0 ? "(none)" : notes.join("; ")}`);
+  const shownNotes =
+    notes.length <= NOTE_CAP
+      ? notes
+      : [...notes.slice(0, NOTE_CAP), `+${notes.length - NOTE_CAP} more notes`];
+  body.push(`notes   ${notes.length === 0 ? "(none)" : shownNotes.join("; ")}`);
 
   let out = [header, ...body];
-  if (out.length > MAX_LINES) {
-    const dropped = out.length - (MAX_LINES - 1);
-    out = out.slice(0, MAX_LINES - 1);
-    out.push(`notes   +${dropped} more lines dropped to stay within ${MAX_LINES}`);
+  // A single line can still be long (a deep workspace path, a run of named
+  // documents), so the whole report is trimmed from the end last of all.
+  while (out.length > 2 && out.join("\n").length + 1 > MAX_BYTES) {
+    const dropped = out.length - 1;
+    out = out.slice(0, -1);
+    out.push(`notes   report trimmed to ${MAX_BYTES} bytes; ${dropped - out.length + 1} line(s) dropped`);
+    if (out.join("\n").length + 1 <= MAX_BYTES) break;
+    out = out.slice(0, -1);
   }
   process.stdout.write(out.join("\n") + "\n");
 }

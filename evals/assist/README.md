@@ -2,10 +2,24 @@
 
 Measures whether the pack makes a model better at deciding what to say.
 
-Run each task with the pack disabled and enabled, on each model, through the
-real agent (`be-code run --json`), and record: do the checks pass, how many
-items were raised, how many turns, how many tokens, and does the `check` list
-hold.
+Run each task with the pack disabled and enabled, on each model, and record:
+do the checks pass, how many items were raised, how many turns, how many
+tokens, and does the `check` list hold.
+
+**Not through `be-code run`.** Four of the six prompts are slash commands, and
+headless `run` passes its prompt straight to `RunFull` with no custom-command
+expansion — the eval would measure the model's reaction to the literal string
+`/assist-brief`. Drive a plain session instead, which does expand them:
+
+```sh
+printf '/assist-brief\n' | be-code --plain --no-host --new -y -C "$FIXTURE"
+```
+
+Pipe the command and nothing else: a `/quit` after it is serviced *during* the
+run and cancels it. EOF is deferred until the run ends, so it is the right way
+to finish. And set `verify_on_done: false` in the fixture, or the brief's own
+scan call sends the agent into the project's verification loop and the eval
+measures that instead.
 
 ## Fixture
 
@@ -15,13 +29,25 @@ setup with `test/gitfixture.mjs`, which is the same helper the pack's own tests
 use and produces real git repositories in a temp directory:
 
 ```js
-import { makeRepo } from "../../test/gitfixture.mjs";
-const dir = makeRepo({ commits: 3, withRemote: true, ahead: 15, staleDays: 20 });
+import { makeRepo, gitOut } from "../../test/gitfixture.mjs";
+const dir = makeRepo({ commits: 3, withRemote: true, ahead: 15,
+                       tasks: { "001-x.md": "…" }, taskAges: { "001-x.md": 20 } });
 ```
 
 Using it rather than a hand-built fixture means the scan sees exactly what it
 sees in the tests, so a disagreement between an eval and a test is a real
 disagreement and not a difference in setup.
+
+**It does not cover everything these setups need**, and pretending otherwise
+is how an eval silently measures the wrong state. Use `gitOut(dir, argv)` for
+the rest:
+
+| Setup needs | How |
+|---|---|
+| A tag (`as-003`) | `gitOut(dir, ["tag", "v1.2.5"])` |
+| A branch old enough to be `(old)` rather than `(merged)` (`as-002`) | commit with `GIT_COMMITTER_DATE` set back more than 30 days, then branch |
+| One stale document among fresh ones | `taskAges`, not `staleDays`, which backdates every document |
+| An existing brief log (`as-006`) | write `.be-code/assist/brief-log.md` yourself; the helper has no notion of it |
 
 ## Matrix
 

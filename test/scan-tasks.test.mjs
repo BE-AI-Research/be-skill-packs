@@ -2,19 +2,29 @@ import { test, assert } from "./run.mjs";
 import { makeRepo } from "./gitfixture.mjs";
 import { scan, line } from "./scanhelper.mjs";
 
+// The engine's real shape, which these fixtures got wrong until the final
+// review: one root per document whose id is the document's number, with its
+// steps nested two spaces beneath. A second unindented numbered bullet is a
+// second top-level task, which the engine splits into a second document.
 const docs = {
-  "001-parser.md": "# 001 — fix the parser\n\n- [x] 1. find the bug\n- [>] 2. fix it\n- [ ] 3. verify\n",
-  "002-docs.md": "# 002 — write the docs\n\n- [ ] 1. outline\n- [!] 2. publish — blocked: needs review\n",
-  "003-old.md": "# 003 — an old one\n\n- [-] 1. abandon — dropped: not needed\n",
+  "001-parser.md":
+    "# 001 — fix the parser\n\n- [>] 1. fix the parser\n  - [x] 1.1. find the bug\n  - [>] 1.2. fix it\n  - [ ] 1.3. verify\n",
+  "002-docs.md":
+    "# 002 — write the docs\n\n- [!] 2. write the docs — blocked: needs review\n  - [ ] 2.1. outline\n",
+  "003-old.md":
+    "# 003 — an old one\n\n- [-] 3. an old one — dropped: not needed\n",
 };
 
-test("task documents are counted by status, and the doing one is named", () => {
+test("task documents are counted by their root's status, and the doing one is named", () => {
   const dir = makeRepo({ commits: 1, tasks: docs });
   const t = line(scan(dir).out, "tasks ");
   assert(/count=3/.test(t), t);
   assert(/doing=002/.test(t) === false, `doing must be the document holding [>], not a guess: ${t}`);
   assert(/doing=001/.test(t), t);
+  assert(/active=1/.test(t), `001's root is [>]: ${t}`);
   assert(/blocked=1/.test(t), t);
+  assert(/dropped=1/.test(t), t);
+  assert(/todo=0/.test(t), `nothing here is plain todo, and todo is read not computed: ${t}`);
 });
 
 // Review Focus 3: a document the engine could not parse is renamed aside. It
