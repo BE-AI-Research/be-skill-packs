@@ -90,6 +90,14 @@ about it. `packs/ui-web` keeps the captured output it was written from in
 [`fixtures/ui-web/captured/`](fixtures/ui-web/captured), which is a habit worth
 copying.
 
+[`docs/ledgers/2026-10-09-assist-pack.md`](docs/ledgers/2026-10-09-assist-pack.md)
+is the same lesson about a pack's *prose*. The assist pack ships almost no
+checks, so its claims are its product — and four of them were wrong until
+somebody ran them: a schedule line the harness rejects, a write grant that
+parses and covers nothing, a task-document shape the engine silently splits
+into several documents, and a slash command that a schedule delivers as six
+literal characters. None was found by reading.
+
 ## Status
 
 Early. The ue5 pack is a seed — two of nine planned chunks, and its build
