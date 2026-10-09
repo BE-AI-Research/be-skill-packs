@@ -78,6 +78,32 @@ test("there is no catch-all entry", () => {
   }
 });
 
+// Go's regexp is RE2, which has no lookaround and no backreferences. A match
+// using them compiles in JavaScript — so it would pass every test here — and
+// is then *skipped with a warning* by the harness, leaving an entry that
+// silently never fires. Nothing in this repository would otherwise notice.
+const NOT_IN_RE2 = /\(\?=|\(\?!|\(\?<=|\(\?<!|\\[1-9]|\\k</;
+
+test("the RE2 check rejects what RE2 rejects", () => {
+  // A guard with nothing to catch is worth as much as the assertion it
+  // replaces, so prove it fires before trusting that it passed.
+  for (const bad of ["foo(?=bar)", "foo(?!bar)", "(?<=a)b", "(a)\\1", "(?<n>a)\\k<n>"]) {
+    assert(NOT_IN_RE2.test(bad), `should have been rejected: ${bad}`);
+  }
+  for (const good of ["TS2322|TS2739", "React Hook .* has (a )?missing dependenc", "(?:a|b)c"]) {
+    assert(!NOT_IN_RE2.test(good), `should have been accepted: ${good}`);
+  }
+});
+
+test("every shipped match compiles under RE2, not only under JavaScript", () => {
+  for (const e of entries) {
+    assert(
+      !NOT_IN_RE2.test(e.match.source),
+      `${e.title}: match uses a construct RE2 has no equivalent for, so the harness would skip this entry: ${e.match.source}`,
+    );
+  }
+});
+
 test("a prop type mismatch routes to the props entry", () => {
   const line = captured("props").find((l) => /TS2322|TS2741|TS2739/.test(l));
   assert(line, "no captured prop diagnostic");
@@ -114,16 +140,28 @@ test("a syntax error routes to nothing, and that is the intended outcome", () =>
   }
 });
 
-// Spec §5.3: entries are ordered by information gap, so the entry whose
-// obvious fix is wrong comes first and the most self-explaining codes last.
-test("entries are ordered by information gap", () => {
-  const titles = entries.map((e) => e.title);
-  const deps = titles.findIndex((t) => /missing a dependency/i.test(t));
-  const props = titles.findIndex((t) => /Prop type/i.test(t));
-  assert(deps !== -1 && props !== -1, `missing expected entries in ${titles.join(", ")}`);
+// Spec §5.3: entries are ordered by how uninformative the diagnostic is, not
+// by how often the defect occurs — curated guidance pays where the tool's own
+// message does not already name the fix, and where it does, the model is near
+// ceiling already. The spec lists that order, so this asserts the whole of it
+// rather than one of its twenty-eight pairs: the first version checked only
+// that deps preceded props, which the shipped frequency order also satisfied.
+const BY_INFORMATION_GAP = [
+  "Effect is missing a dependency", // the obvious fix is wrong
+  "Click handler on a non-interactive element", // names a rule, not the remedy
+  "Hook called conditionally", // says what is wrong, not how to restructure
+  "Input without a label", // "add a label" is implied; the htmlFor pairing is not
+  "Image without alt text", // mostly self-explaining; exists for the alt="" case
+  "Link with no text", // likewise; carries the icon-link case
+  "Value may be null or undefined", // clear; exists to stop `!` silencing it
+  "Prop type does not match", // most self-explaining; stops the type being widened
+];
+
+test("entries are ordered by information gap, exactly as the spec lists them", () => {
+  const actual = entries.map((e) => e.title);
   assert(
-    deps < props,
-    "exhaustive-deps must precede the prop-mismatch entry: its message is the less useful of the two",
+    actual.join(" | ") === BY_INFORMATION_GAP.join(" | "),
+    `order does not match spec §5.3\n  want: ${BY_INFORMATION_GAP.join(" | ")}\n  got:  ${actual.join(" | ")}`,
   );
 });
 

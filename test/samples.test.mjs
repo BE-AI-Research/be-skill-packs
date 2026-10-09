@@ -43,6 +43,19 @@ const TYPECHECK = join(PACK, "tools/typecheck");
 // exclusions could otherwise quietly empty the suite out.
 const ELIDED = "…";
 
+// An ellipsis in a string or in JSX text is content — `Searching…` is a real
+// label — while one standing where code belongs is an elision. Checking for
+// the character alone skipped the pack's only async example, which is exactly
+// the sample most worth checking, so strings and JSX text are removed first.
+function elided(body) {
+  const code = body
+    .replace(/"[^"\n]*"/g, '""')
+    .replace(/'[^'\n]*'/g, "''")
+    .replace(/`[^`]*`/g, "``")
+    .replace(/>[^<>{}\n]*</g, "><");
+  return code.includes(ELIDED);
+}
+
 function samples() {
   const out = [];
   for (const f of readdirSync(join(PACK, "chunks"))) {
@@ -50,7 +63,7 @@ function samples() {
     let i = 0;
     for (const [, body] of text.matchAll(/```tsx\n([\s\S]*?)```/g)) {
       i++;
-      if (body.includes(ELIDED)) continue;
+      if (elided(body)) continue;
       if (!/\b(export|function)\b/.test(body)) continue;
       out.push({ name: `${f.replace(/\.md$/, "")}-${i}`, body });
     }
@@ -58,7 +71,7 @@ function samples() {
   for (const f of readdirSync(join(PACK, "templates"))) {
     const body = readFileSync(join(PACK, "templates", f), "utf8").replace(/\{\{NAME\}\}/g, "Sample");
     const name = f.startsWith("Component.test") ? "Sample.test" : "Sample";
-    if (!body.includes(ELIDED)) out.push({ name, body });
+    if (!elided(body)) out.push({ name, body });
   }
   return out;
 }
@@ -70,17 +83,16 @@ function samples() {
 // finding about the pack.
 const AMBIENT = `import type { ReactNode } from "react";
 declare global {
-  // The hooks with their real signatures. A chunk is prose and does not repeat
-  // the import line in every block; what it must not do is misuse them.
-  const useState: typeof import("react").useState;
-  const useEffect: typeof import("react").useEffect;
-  const useLayoutEffect: typeof import("react").useLayoutEffect;
-  const useRef: typeof import("react").useRef;
-  const useId: typeof import("react").useId;
-  const useReducer: typeof import("react").useReducer;
-  const useMemo: typeof import("react").useMemo;
-  const useCallback: typeof import("react").useCallback;
+  // No hooks here on purpose. Supplying them ambiently let every example omit
+  // its own import line, so a copied block gave the reader TS2304 with no
+  // playbook entry to route it. Each sample now imports what it calls, and
+  // leaving them out of this file is what keeps that true.
+  //
+  // Project-specific names stay ambient: a chunk cannot define the reader's
+  // whole application, and eliding a domain type is not the same kind of
+  // omission as eliding an import anyone can copy.
   type Item = { id: string; price: number; qty: number; checked?: boolean };
+  type Result = { id: string; title: string };
   // Deliberately permissive: a chunk names a Props type it does not show, and
   // the point of this harness is the accessibility and rule checks, not
   // inventing the type a sample elided.
@@ -140,6 +152,24 @@ function run(bin, dir) {
     return { out: (err.stdout ?? "") + (err.stderr ?? ""), code: err.status ?? 1 };
   }
 }
+
+test("an ellipsis in content is not mistaken for an elision", () => {
+  assert(!elided('<p aria-live="polite">Searching…</p>'), "JSX text ellipsis");
+  assert(!elided('const label = "Loading…";'), "string ellipsis");
+  assert(!elided("const t = `one…two`;"), "template-literal ellipsis");
+  assert(elided("state.items.map(…);"), "elided call argument");
+  assert(elided("useEffect(() => { if (flag) … }, [flag]);"), "elided effect body");
+});
+
+test("the async effect example is among the checked samples", () => {
+  // It was silently skipped: the only sample with cancellation, a cleanup
+  // function and a catch, and nothing was verifying it.
+  const names = samples().map((s) => s.name);
+  assert(
+    names.some((n) => n.startsWith("effects")),
+    `effects.md's example is not being checked: ${names}`,
+  );
+});
 
 test("there are samples to check, from chunks and from templates", () => {
   const found = samples();

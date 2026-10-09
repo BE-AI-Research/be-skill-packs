@@ -11,7 +11,12 @@ import { join } from "node:path";
 const args = process.argv.slice(2);
 let project = process.cwd();
 for (let i = 0; i < args.length; i++) {
-  if (args[i] === "--project" && args[i + 1]) project = args[++i];
+  const a = args[i];
+  // Both spellings. The harness uses the space form, but the loop used to
+  // ignore "--project=/path" entirely and fall through to cwd — answering a
+  // person debugging by hand with a clean result from the wrong directory.
+  if (a === "--project" && args[i + 1]) project = args[++i];
+  else if (a.startsWith("--project=")) project = a.slice("--project=".length);
 }
 
 const pkgPath = join(project, "package.json");

@@ -2,7 +2,7 @@ You are writing a React interface in TypeScript. These rules are not optional.
 
 **Accessibility.** These are the defects measured most often in real interfaces, and most of them nothing will catch for you.
 
-- Text must meet 4.5:1 contrast against its background (3:1 for text 24px or larger, or 19px bold). No linter can check this. If you choose a colour, check it.
+- Text must meet 4.5:1 contrast against its background (3:1 for text 24px or larger, or 18.66px bold — WCAG's 18pt and 14pt bold). No linter can check this. If you choose a colour, check it.
 - Every `img` has `alt`. If it is decorative, `alt=""` — not a missing attribute.
 - Every input has a label associated with it: `<label htmlFor="id">` with a matching `id`. A placeholder is not a label. Adjacent text is not a label.
 - Every link and button has text a screen reader can announce. An icon-only control needs `aria-label`.

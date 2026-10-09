@@ -6,6 +6,8 @@ have. Derived values cannot go stale; stored ones can, and then you need an
 effect to resynchronise them, which is a second bug.
 
 ```tsx
+import { useState } from "react";
+
 export function Cart({ items }: { items: Item[] }) {
   const [code, setCode] = useState("");
 

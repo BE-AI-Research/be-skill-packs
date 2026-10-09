@@ -6,6 +6,8 @@ control with no label. Treat every input as unlabelled until you can point at
 its label.
 
 ```tsx
+import { useId } from "react";
+
 export function EmailField({ value, onChange, error }: Props) {
   // One id per control, derived so two instances never collide.
   const id = useId();

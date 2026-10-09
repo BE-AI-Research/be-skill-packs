@@ -39,6 +39,70 @@ test("an entry with a kind does not take another kind", () => {
   assert(hit && hit.title === "Unknown failure", hit && hit.title);
 });
 
+// The three ways this second implementation drifted from the Go matcher it
+// stands in for, each checked against internal/playbook/playbook.go. A
+// divergence here means the tests in this repository prove something about
+// behaviour the harness does not have.
+
+// Go: `if seen[key] { warn("…keeping the first"); continue }`
+test("a repeated field key keeps the first value, as the Go parser does", () => {
+  const entries = parsePlaybook(`## E
+match: first
+cause: the first cause
+cause: the second cause
+fix:
+1. f
+next: n
+`);
+  assert(entries.length === 1, `got ${entries.length} entries`);
+  assert(entries[0].cause === "the first cause", `kept ${JSON.stringify(entries[0].cause)}`);
+});
+
+test("a repeated match line keeps the first regex", () => {
+  const entries = parsePlaybook(`## E
+match: first
+match: second
+cause: c
+fix:
+1. f
+next: n
+`);
+  assert(entries[0].match.source === "first", entries[0].match.source);
+});
+
+// Go: a bad regex warns and skips that entry; the rest of the document still
+// parses. The JS version threw, which aborted the whole parse — so one typo
+// in one entry would have taken the entire playbook down in the tests while
+// costing the harness only that entry.
+test("a bad match regex skips just that entry, not the whole document", () => {
+  const entries = parsePlaybook(`## Broken
+match: (unclosed
+cause: c
+fix:
+1. f
+next: n
+
+## Fine
+match: works
+cause: c
+fix:
+1. f
+next: n
+`);
+  assert(entries.length === 1, `got ${entries.length} entries: ${entries.map((e) => e.title)}`);
+  assert(entries[0].title === "Fine", entries[0].title);
+});
+
+test("an entry with no match line is skipped", () => {
+  const entries = parsePlaybook(`## No match
+cause: c
+fix:
+1. f
+next: n
+`);
+  assert(entries.length === 0, `got ${entries.length} entries`);
+});
+
 test("a fenced block does not create a field", () => {
   const fenced = `## E
 match: real

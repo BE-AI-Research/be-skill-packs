@@ -6,6 +6,7 @@ import { join } from "node:path";
 
 const LINT = new URL("../packs/ui-web/tools/lint", import.meta.url).pathname;
 const TESTW = new URL("../packs/ui-web/tools/test", import.meta.url).pathname;
+const TYPECHECK = new URL("../packs/ui-web/tools/typecheck", import.meta.url).pathname;
 const FIXTURE = new URL("../fixtures/ui-web", import.meta.url).pathname;
 
 // The regex BE-Code's msvc parser actually applies, copied from
@@ -88,6 +89,39 @@ test("a workspace reached through a symlink still yields relative paths", () => 
   const { out } = run(LINT, link);
   assert(/^src\/NoAlt\.tsx\(\d+,\d+\): error ESL001:/m.test(out), out);
   assert(!out.includes(".."), `path escaped the workspace: ${out}`);
+});
+
+// Every wrapper took only the space-separated form, so `--project=/path` was
+// ignored and the wrapper silently ran against its own cwd instead — a wrong
+// answer rather than an error, which is the worst way to be wrong. The harness
+// uses the space form, so this bit only a person debugging by hand.
+test("every wrapper accepts --project=<path> as well as --project <path>", () => {
+  const dir = scaffold(mkdtempSync(join(tmpdir(), "eqform-")));
+  writeFileSync(join(dir, "src", "NoAlt.tsx"), 'export const I = () => <img src="x.png" />;\n');
+  const eq = (bin) => {
+    try {
+      return { out: execFileSync(bin, [`--project=${dir}`], { encoding: "utf8" }), code: 0 };
+    } catch (err) {
+      return { out: (err.stdout ?? "") + (err.stderr ?? ""), code: err.status ?? 1 };
+    }
+  };
+
+  const lint = eq(LINT);
+  assert(lint.code !== 0, `lint should have found the violation: ${lint.out}`);
+  assert(/^src\/NoAlt\.tsx\(\d+,\d+\): error ESL001:/m.test(lint.out), lint.out);
+
+  // Each of these is a discriminator: had the wrapper fallen back to its own
+  // cwd — this repository — typecheck would have found no tsconfig.json there
+  // and the test wrapper would have run this repository's whole suite.
+  writeFileSync(join(dir, "src", "Bad.tsx"), "export const n: string = 1;\n");
+  const tc = eq(TYPECHECK);
+  assert(tc.code !== 0, `typecheck should have found the type error: ${tc.out}`);
+  assert(/^src\/Bad\.tsx\(\d+,\d+\): error TS/m.test(tc.out), tc.out);
+
+  writeFileSync(join(dir, "package.json"), '{ "name": "x", "private": true }\n');
+  const testw = eq(TESTW);
+  assert(testw.code === 0, `exit ${testw.code}: ${testw.out}`);
+  assert(/no test script/i.test(testw.out), testw.out);
 });
 
 // Review Focus 1: a bare project with no ESLint config. The wrapper must be

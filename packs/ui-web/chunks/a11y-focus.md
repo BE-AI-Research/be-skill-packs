@@ -6,6 +6,8 @@ starts only when you build something the platform does not have — a dialog, a
 menu, a combobox.
 
 ```tsx
+import { useEffect, useRef } from "react";
+
 export function Dialog({ onClose, children }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const returnTo = useRef<HTMLElement | null>(null);
@@ -15,10 +17,10 @@ export function Dialog({ onClose, children }: Props) {
     returnTo.current = document.activeElement as HTMLElement | null;
     ref.current?.focus();
 
-    // Escape belongs on the document, not on the dialog element. A key
-    // listener on a non-interactive element only fires while that element
-    // itself has focus — and once the user tabs to a control inside, it does
-    // not. It is also a lint error (no-noninteractive-element-interactions).
+    // Escape belongs on the document, not the dialog element: a listener there
+    // only fires while that element itself has focus, so it stops working the
+    // moment the user tabs to a control inside. It is a lint error too
+    // (no-noninteractive-element-interactions).
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
@@ -65,8 +67,11 @@ moment as its message announces nothing.
 <p aria-live="polite">{status}</p>  // container always rendered, text changes
 ```
 
-`role="alert"` is an assertive live region in one attribute, and is the right
-choice for a validation error.
+`role="alert"` is an assertive live region in one attribute, and is right for a
+validation error — the exception, because interrupting is only rude when the
+user did not ask for it. They just submitted, and the error is the answer. What
+`assertive` gets wrong is the background update: a saved notice, a changing
+count, something arriving over a socket.
 
 ## Common mistakes
 

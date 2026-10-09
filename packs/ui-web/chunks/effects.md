@@ -15,23 +15,31 @@ Work through this before writing one:
 | Subscribing, timing, measuring, fetching | An effect. |
 
 ```tsx
+import { useEffect, useState } from "react";
+
 export function Results({ query }: { query: string }) {
   const [data, setData] = useState<Result[] | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     // Every async effect needs cancellation, or a slow earlier response
     // overwrites a fast later one and the list shows the wrong query.
     const ac = new AbortController();
     setData(null);
+    setFailed(false);
     fetch(`/api/search?q=${encodeURIComponent(query)}`, { signal: ac.signal })
       .then((r) => r.json())
       .then(setData)
       .catch((e) => {
-        if (e.name !== "AbortError") throw e;
+        // Handle it here. Rethrowing from the last .catch in a chain gives an
+        // unhandled rejection — there is nothing left to catch it, and the
+        // user sees a spinner that never stops.
+        if (e.name !== "AbortError") setFailed(true);
       });
     return () => ac.abort();
   }, [query]); // re-runs when query changes, and cleans up first
 
+  if (failed) return <p role="alert">Search failed.</p>;
   if (!data) return <p aria-live="polite">Searching…</p>;
   return <ResultList results={data} />;
 }
