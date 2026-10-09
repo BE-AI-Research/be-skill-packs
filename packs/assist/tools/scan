@@ -1,0 +1,81 @@
+#!/usr/bin/env node
+// Reports what is true about this workspace, so the model never has to infer
+// it. The judgement about what matters lives in the pack's core.md; this file
+// only answers questions of fact.
+//
+// It always exits 0 except on its own usage error. A pack whose script fails
+// when something is missing breaks every workspace it is switched on in, and
+// this pack is switched on by hand — so it may be pointed anywhere.
+
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
+const args = process.argv.slice(2);
+let project = process.cwd();
+let staleDays = 14;
+for (let i = 0; i < args.length; i++) {
+  const a = args[i];
+  if (a === "--project" && args[i + 1]) project = args[++i];
+  else if (a.startsWith("--project=")) project = a.slice("--project=".length);
+  else if (a === "--stale-days" && args[i + 1]) staleDays = Number(args[++i]);
+  else if (a.startsWith("--stale-days=")) staleDays = Number(a.slice("--stale-days=".length));
+}
+if (!Number.isFinite(staleDays) || staleDays < 0) {
+  process.stderr.write("usage: scan --project <dir> [--stale-days <n>]\n");
+  process.exit(2);
+}
+
+const notes = [];
+const lines = [];
+
+function git(argv) {
+  try {
+    return execFileSync("git", argv, {
+      cwd: project,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+const isRepo =
+  existsSync(join(project, ".git")) && git(["rev-parse", "--is-inside-work-tree"]) === "true";
+if (!isRepo) {
+  notes.push("not a git repository; no branch, unpushed or branch facts");
+} else {
+  const branch = git(["rev-parse", "--abbrev-ref", "HEAD"]);
+  const detached = branch === "HEAD" || branch === null;
+  const parts = [`branch=${detached ? "(detached)" : branch}`];
+
+  // ahead/behind need an upstream. Without one they are unknown, and printing
+  // zero would read as "nothing to push" — a claim this cannot make.
+  const upstream = detached
+    ? null
+    : git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"]);
+  if (!upstream) {
+    parts.push("upstream=none ahead=? behind=?");
+  } else {
+    const counts = git(["rev-list", "--left-right", "--count", `${upstream}...HEAD`]);
+    const [behind, ahead] = (counts ?? "? ?").split(/\s+/);
+    parts.push(`upstream=${upstream}`, `ahead=${ahead}`, `behind=${behind}`);
+  }
+  const porcelain = git(["status", "--porcelain"]);
+  parts.push(`dirty=${porcelain ? porcelain.split("\n").filter(Boolean).length : 0}`);
+  lines.push(`git     ${parts.join(" ")}`);
+}
+
+// emit prints the report. Later sections add to `lines` above this call; Task 5
+// replaces this body with the assembler that adds the ceiling. Keeping it a
+// function from the start means every task's tests pass on their own and
+// nothing has to be restructured later.
+function emit() {
+  const header = `# assist scan  ${new Date().toISOString()}  workspace=${project}`;
+  const body = lines.slice();
+  body.push(`notes   ${notes.length === 0 ? "(none)" : notes.join("; ")}`);
+  process.stdout.write([header, ...body].join("\n") + "\n");
+}
+
+emit();
