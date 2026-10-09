@@ -9,7 +9,7 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 const args = process.argv.slice(2);
 let project = process.cwd();
@@ -21,6 +21,13 @@ for (let i = 0; i < args.length; i++) {
   else if (a === "--stale-days" && args[i + 1]) staleDays = Number(args[++i]);
   else if (a.startsWith("--stale-days=")) staleDays = Number(a.slice("--stale-days=".length));
 }
+// Resolved to an absolute path before anything uses it. A relative
+// --project (". " is the natural one, and what the commands pass) made relOf
+// slice project.length characters off an already-relative path and eat the
+// leading dot, so ".be-code/tasks" was reported as "be-code/tasks" — a path
+// that does not exist. It also makes the header's workspace= worth reading.
+project = resolve(project);
+
 if (!Number.isFinite(staleDays) || staleDays < 0) {
   process.stderr.write("usage: scan --project <dir> [--stale-days <n>]\n");
   process.exit(2);
@@ -172,15 +179,51 @@ if (changeParts.length > 0 || version) {
 }
 if (!version) notes.push("no version found in package.json, build.mk or VERSION");
 
-// emit prints the report. Later sections add to `lines` above this call; Task 5
-// replaces this body with the assembler that adds the ceiling. Keeping it a
-// function from the start means every task's tests pass on their own and
-// nothing has to be restructured later.
+// Stale local branches. Merged into the default branch is safe to delete;
+// merely old is not, so the two are distinguished rather than lumped.
+if (isRepo) {
+  const head = git(["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]);
+  const base = head && git(["rev-parse", "--verify", "--quiet", head]) ? head : "main";
+  const merged = new Set(
+    (git(["branch", "--format=%(refname:short)", "--merged", base]) ?? "").split("\n").filter(Boolean),
+  );
+  const all = (git(["for-each-ref", "--format=%(refname:short)\t%(committerdate:unix)", "refs/heads"]) ?? "")
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => {
+      const [name, when] = l.split("\t");
+      return { name, when: Number(when) };
+    });
+  const current = git(["rev-parse", "--abbrev-ref", "HEAD"]);
+  const oldCutoff = Date.now() / 1000 - 30 * 86400;
+  const staleBranches = all
+    .filter((b) => b.name !== current && b.name !== base.replace(/^origin\//, ""))
+    .map((b) => (merged.has(b.name) ? { ...b, why: "merged" } : b.when < oldCutoff ? { ...b, why: "old" } : null))
+    .filter(Boolean);
+  if (staleBranches.length > 0) {
+    const shown = staleBranches.slice(0, 8).map((b) => `${b.name}(${b.why})`).join(" ");
+    const more = staleBranches.length > 8 ? ` +${staleBranches.length - 8} more` : "";
+    lines.push(`git     stale-branches=${staleBranches.length} ${shown}${more}`);
+  }
+}
+
+// The ceiling bounds the report so a repository with three hundred branches
+// cannot crowd out everything else. Only the lists are cut, never the counts:
+// a truncated list beside a true number is useful, a shortened number is a lie.
+const MAX_LINES = 60;
+
 function emit() {
   const header = `# assist scan  ${new Date().toISOString()}  workspace=${project}`;
   const body = lines.slice();
   body.push(`notes   ${notes.length === 0 ? "(none)" : notes.join("; ")}`);
-  process.stdout.write([header, ...body].join("\n") + "\n");
+
+  let out = [header, ...body];
+  if (out.length > MAX_LINES) {
+    const dropped = out.length - (MAX_LINES - 1);
+    out = out.slice(0, MAX_LINES - 1);
+    out.push(`notes   +${dropped} more lines dropped to stay within ${MAX_LINES}`);
+  }
+  process.stdout.write(out.join("\n") + "\n");
 }
 
 emit();
