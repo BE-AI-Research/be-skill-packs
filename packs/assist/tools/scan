@@ -8,7 +8,7 @@
 // this pack is switched on by hand — so it may be pointed anywhere.
 
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const args = process.argv.slice(2);
@@ -41,6 +41,12 @@ function git(argv) {
   }
 }
 
+// Paths are reported relative to the workspace: an absolute path in a brief
+// is noise, and the person already knows where they are.
+function relOf(p) {
+  return p.startsWith(project) ? p.slice(project.length).replace(/^[/\\]/, "") : p;
+}
+
 const isRepo =
   existsSync(join(project, ".git")) && git(["rev-parse", "--is-inside-work-tree"]) === "true";
 if (!isRepo) {
@@ -65,6 +71,59 @@ if (!isRepo) {
   const porcelain = git(["status", "--porcelain"]);
   parts.push(`dirty=${porcelain ? porcelain.split("\n").filter(Boolean).length : 0}`);
   lines.push(`git     ${parts.join(" ")}`);
+}
+
+// The task engine's own format: .be-code/tasks/NNN-<slug>.md, a heading and a
+// nested checklist. Marks are [ ] todo, [>] doing, [x] done, [!] blocked and
+// [-] dropped (be-code/internal/engine/readme.go is authoritative). Note the
+// directory: the engine uses .be-code, while packs and commands use .becode.
+const tasksDir = join(project, ".be-code", "tasks");
+let entries = [];
+try {
+  entries = readdirSync(tasksDir).filter((f) => /^\d+-.*\.md$/.test(f));
+} catch {
+  entries = [];
+}
+// A document the engine could not parse is renamed aside as
+// NNN-<slug>.broken-<stamp>.md. It is not a task; counting it would report
+// work that does not exist.
+entries = entries.filter((f) => !/\.broken-\d/.test(f));
+
+if (entries.length === 0) {
+  notes.push(`no task documents in ${relOf(tasksDir)}`);
+} else {
+  let blocked = 0;
+  let doing = null;
+  const stale = [];
+  const cutoff = Date.now() - staleDays * 86400000;
+  for (const f of entries.sort()) {
+    const id = f.split("-", 1)[0];
+    const full = join(tasksDir, f);
+    let body = "";
+    try {
+      body = readFileSync(full, "utf8");
+    } catch {
+      notes.push(`task document ${f} could not be read`);
+      continue;
+    }
+    if (/^\s*- \[>\]/m.test(body) && doing === null) doing = id;
+    if (/^\s*- \[!\]/m.test(body)) blocked++;
+    try {
+      if (statSync(full).mtimeMs < cutoff) stale.push(id);
+    } catch {
+      /* counted above */
+    }
+  }
+  const todo = entries.length - (doing ? 1 : 0) - blocked;
+  const parts = [
+    `dir=${relOf(tasksDir)}`,
+    `count=${entries.length}`,
+    `doing=${doing ?? "none"}`,
+    `todo=${todo < 0 ? 0 : todo}`,
+    `blocked=${blocked}`,
+    `stale>${staleDays}d=${stale.length}` + (stale.length ? `(${stale.join(",")})` : ""),
+  ];
+  lines.push(`tasks   ${parts.join(" ")}`);
 }
 
 // emit prints the report. Later sections add to `lines` above this call; Task 5
