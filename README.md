@@ -34,8 +34,14 @@ window with rules has taken away the thing it was supposed to help with.
 
 ## Using a pack
 
-**With [BE-Code](https://github.com/BE-AI-Research/be-code-redux)** (1.3.0 or
-newer):
+> **Nothing here loads yet.** Pack support lands in BE-Code 1.3.0, which is
+> not released — the latest release is v1.2.5 and has no `packs` command. Until
+> 1.3.0 ships, these packs are readable but not installable, and the
+> instructions below describe what will work rather than what does. Watch
+> [be-code-redux](https://github.com/BE-AI-Research/be-code-redux/releases).
+
+**With [BE-Code](https://github.com/BE-AI-Research/be-code-redux)** 1.3.0 or
+newer:
 
 ```sh
 git clone https://github.com/BE-AI-Research/be-skill-packs
@@ -100,10 +106,16 @@ literal characters. None was found by reading.
 
 ## Status
 
-Early. The ue5 pack is a seed — two of nine planned chunks, and its build
-wrapper has been tested with `--dry-run` against a fake engine tree but not
-against a real Unreal install. The format is implemented and tested in
-BE-Code 1.3.0; the parser behaviour it describes is covered by tests there.
+Early, and ahead of the harness that loads it. The format is implemented and
+tested in BE-Code's main branch and the parser behaviour it describes is
+covered by tests there, but that work is unreleased: **no published BE-Code
+can install a pack yet.**
+
+The ue5 pack is a seed — two of nine planned chunks, and its build wrapper has
+been tested with `--dry-run` against a fake engine tree but not against a real
+Unreal install. The assist pack has been run end to end against a real local
+model; the other two have not. Each pack's own README says what it does not do,
+and `docs/ledgers/` records where the plans turned out to be wrong.
 
 Contributions welcome, particularly real toolchain output: a few hundred lines
 of a genuinely failing build is worth more to a playbook than any amount of
