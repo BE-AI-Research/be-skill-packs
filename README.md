@@ -79,6 +79,16 @@ sitting. The shape that works:
 The honest version of step 3: a playbook written from documentation is a
 guess. Write it from output you have seen.
 
+[`docs/ledgers/2026-10-07-ui-web-pack.md`](docs/ledgers/2026-10-07-ui-web-pack.md)
+is that advice applied, kept as a record of what it cost: the error codes the
+plan guessed wrong, the accessibility defects no standard lint config catches
+at all, a playbook that turned out to be inert on the one check it was written
+for, and three verify commands that only worked on the fixture's own layout.
+Each was found by running the real toolchain, and none of them by reasoning
+about it. `packs/ui-web` keeps the captured output it was written from in
+[`fixtures/ui-web/captured/`](fixtures/ui-web/captured), which is a habit worth
+copying.
+
 ## Status
 
 Early. The ue5 pack is a seed — two of nine planned chunks, and its build
