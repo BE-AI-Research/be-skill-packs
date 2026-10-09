@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "name": "assist",
+  "version": "0.1.0",
+  "description": "A personal assistant over the state of the work: git, task documents, the changelog",
+  "core": { "file": "core.md", "budget_tokens": 1500 },
+  "chunks": {},
+  "commands": "commands",
+  "requires": { "be_code": ">=1.3.0" }
+}
