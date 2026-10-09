@@ -126,6 +126,52 @@ if (entries.length === 0) {
   lines.push(`tasks   ${parts.join(" ")}`);
 }
 
+// The changelog's Unreleased section, and the version. An empty Unreleased
+// before a release is the interesting case, so it is named rather than
+// counted as zero.
+const clPath = join(project, "CHANGELOG.md");
+const changeParts = [];
+try {
+  const cl = readFileSync(clPath, "utf8");
+  const m = cl.match(/^##\s+Unreleased\s*$([\s\S]*?)(?=^##\s|$(?![\s\S]))/m);
+  if (!m) {
+    changeParts.push("unreleased=absent");
+  } else {
+    const n = (m[1].match(/^-\s+\*\*/gm) ?? []).length;
+    changeParts.push(n === 0 ? "unreleased=empty" : `unreleased=${n}-entries`);
+  }
+} catch {
+  notes.push("no CHANGELOG.md in this workspace");
+}
+
+// Version sources, in order. First hit wins; none is "unknown" plus a note,
+// because a guessed version in a brief gets acted on.
+let version = null;
+const tryVersion = [
+  () => {
+    const pkg = JSON.parse(readFileSync(join(project, "package.json"), "utf8"));
+    return typeof pkg.version === "string" ? pkg.version : null;
+  },
+  () => (readFileSync(join(project, "build.mk"), "utf8").match(/^VERSION\s*:?=\s*(\S+)/m) ?? [])[1] ?? null,
+  () => readFileSync(join(project, "VERSION"), "utf8").trim() || null,
+];
+for (const f of tryVersion) {
+  try {
+    version = f();
+  } catch {
+    version = null;
+  }
+  if (version) break;
+}
+if (changeParts.length > 0 || version) {
+  changeParts.push(`version=${version ?? "unknown"}`);
+  const tag = isRepo ? git(["describe", "--tags", "--abbrev=0"]) : null;
+  changeParts.push(`latest-tag=${tag ?? "none"}`);
+  if (version && tag) changeParts.push(`matches=${tag.replace(/^v/, "") === version ? "yes" : "no"}`);
+  lines.push(`change  ${changeParts.join(" ")}`);
+}
+if (!version) notes.push("no version found in package.json, build.mk or VERSION");
+
 // emit prints the report. Later sections add to `lines` above this call; Task 5
 // replaces this body with the assembler that adds the ceiling. Keeping it a
 // function from the start means every task's tests pass on their own and
