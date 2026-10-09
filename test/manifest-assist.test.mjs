@@ -50,3 +50,12 @@ test("core quotes no interruption figure", () => {
   const core = readFileSync(root + "core.md", "utf8");
   assert(!/\b\d+\s*(minutes|min)\b/i.test(core), "core quotes a figure the spec says to omit");
 });
+
+test("every chunk exists and is under the 4 KiB tool-output floor", () => {
+  for (const [name, chunk] of Object.entries(manifest.chunks ?? {})) {
+    const bytes = statSync(root + chunk.file).size;
+    assert(bytes < 4096, `chunk ${name} is ${bytes} bytes`);
+    assert(chunk.summary && chunk.summary.length > 0, `chunk ${name} has no summary`);
+  }
+  assert(Object.keys(manifest.chunks).length === 4, "expected four chunks");
+});
