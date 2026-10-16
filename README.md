@@ -1,5 +1,7 @@
 # BE Skill Packs
 
+<img width="1024" height="768" alt="TheSkills" src="https://github.com/user-attachments/assets/61b512c2-a305-47e9-876a-b51392cf674d" />
+
 Domain expertise for agentic coding harnesses, as folders of Markdown and JSON.
 
 A **pack** is what you give a coding agent so it stops guessing about a
