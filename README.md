@@ -1,4 +1,4 @@
-# BE Skill Packs
+# BE-Code Redux: Skill Packs
 
 <img width="1024" height="768" alt="TheSkills" src="https://github.com/user-attachments/assets/61b512c2-a305-47e9-876a-b51392cf674d" />
 
