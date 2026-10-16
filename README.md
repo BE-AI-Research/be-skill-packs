@@ -14,10 +14,17 @@ a pack executes inside the harness: a pack *names* a command to run and
 *names* a parser the harness already has, so loading one never means running
 code somebody else wrote into your agent's process.
 
+> **Status: beta.** These packs are early, still being written, and — for the
+> ones that need an external server (reverse-engineer, agentcad) — their
+> capabilities depend on a server that is not part of this repository. They are
+> provided **as-is, without warranty of any kind**: verify what a pack makes the
+> agent do, and do not rely on it for work you cannot check. Use at your own risk.
+
 | Pack | What it knows | State |
 |---|---|---|
 | [`packs/assist`](packs/assist) | A personal assistant over the state of the work: git, task documents, the changelog. Facts come from a scan script; judgement comes from core's rules, whose spine is withholding | 0.1.0 — seed. Switched on by hand, never detected. No test state, no outward action; phase 2 (mail, calendar) waits on pack-declared MCP servers |
 | [`packs/reverse-engineer`](packs/reverse-engineer) | Reverse engineering a binary or app the model has no prior knowledge of: connect to the REA MCP server, route by target, native artifacts via Hopper/Ghidra, JavaScript source recovery via Wakaru, Android via JADX, and runtime observation. Evidence-first, every claim a ref or a quote | 0.1.0 — ported from the REA toolkit. Six chunks, all read-only; the capability lives in the external REA server, so there are no verify commands or parsers. No `detect` — switched on by hand, never auto-activated |
+| [`packs/agentcad`](packs/agentcad) | Building, validating, and exporting production-grade CAD parts and assemblies in Python from a natural-language brief, in build123d (default) or CadQuery. The operating guide is the product: canonical workflow, tool catalog, API cheat-sheet, patterns, verification gates | 0.1.0 — ported from the AgentCAD `skill` command. Two complete, byte-identical runtime guides (build123d core + CadQuery chunk); the capability lives in the external AgentCAD server, so there are no verify commands or parsers. No `detect` — switched on by hand, never auto-activated |
 | [`packs/ue5`](packs/ue5) | Unreal Engine 5 C++: reflection and UHT, modules and `.Build.cs`, object lifetime, replication, building with UnrealBuildTool, and 15 playbook entries for the errors that stop a build | 0.1.0 — seed. Two chunks of a planned nine; never yet run against a real engine |
 | [`packs/ui-web`](packs/ui-web) | React + TypeScript interfaces: accessibility ordered by measured real-world frequency, state, effects, types. Eight playbook entries, every one written from captured toolchain output rather than from a rule's documentation | 0.1.0 — seed. Six chunks; contrast, empty buttons and unlabelled inputs are rules rather than checks, because no standard lint config catches them |
 
