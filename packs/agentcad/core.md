@@ -1,0 +1,501 @@
+---
+name: agentcad
+description: >
+  CAD tool for AI agents. Use when the user asks you to design, model, or build
+  a 3D object. agentcad executes build123d Python scripts and produces STEP
+  files, PNG renders, mesh exports (STL/GLB/OBJ), and geometric metrics.
+compatibility: Requires Python 3.10-3.12 and agentcad installed (pip install agentcad).
+allowed-tools: Bash(agentcad:*)
+---
+
+# agentcad — CAD tool for AI agents
+
+You have access to `agentcad`, a CLI that turns build123d Python scripts into 3D
+geometry. Operational commands return structured JSON with `"command"` and
+`"status"` keys. `--help` and `agentcad docs` return readable text.
+
+## First-time setup
+
+```bash
+agentcad init --name <project_name>
+```
+
+`init` creates the project and installs this guide, so nothing else is
+required before the core workflow. `agentcad --help` and `agentcad docs` hold
+the full command reference when you need more than this guide.
+
+If `agentcad.json` already exists in the selected build directory (the project
+root by default), this project is already initialized — skip `init` and go
+straight to the required workflow. Use `agentcad context` to check configured
+state.
+
+Before revising, read `agentcad review list --status open` when context reports
+`open_review_comments`. Comments include the source revision, part id, CAD
+point, saved camera, and screenshot path. Reply with
+`agentcad review reply C1 --message "What changed" --version current`.
+Either the human or agent can resolve or reopen a thread, optionally with a
+message. Agents can start a thread with
+`agentcad review comment --part PART_ID --message "Question for the reviewer"`.
+See `agentcad docs review`. Feedback is discovered on the agent's next turn;
+leaving a comment does not automatically start an agent run.
+
+## Required workflow
+
+Use this workflow for every CAD task, whether generating a new model or editing
+an existing one:
+
+**Inspect -> Specify -> Build -> Validate -> Deliver**
+
+Do not skip directly from the request to building. Each stage produces the
+evidence needed by the next stage. If validation fails, return to the earliest
+stage whose assumptions were wrong, then build and validate again.
+
+### 1. Inspect
+
+Understand the available evidence before writing geometry.
+
+- For generation, inspect every supplied drawing, image, and requirement. Note
+  units, views, orientation, repeated features, and which dimensions are
+  explicit versus inferred.
+- For edits, inspect the source STEP/BREP before writing the edit script:
+  ```bash
+  agentcad inspect input.step --summary
+  agentcad measure input.step
+  ```
+  Use `--ids` only when you need addressable faces or edges. IDs are stable
+  within the same shape but can change after an edit.
+- Read `edit_risk` and validation findings before choosing an editing strategy.
+  Do not start with fragile Boolean or fillet operations against a high-risk
+  imported model.
+- Use `agentcad render FILE --view top,front,right,iso` when orientation or a
+  feature location is unclear. In a project, `agentcad context` reports the
+  runtime, build root, current version, and recovery state.
+
+Inspection is complete when you can describe the relevant geometry, its
+orientation and units, and any uncertainty that affects the requested result.
+
+### 2. Specify
+
+Turn the request into a concrete geometry contract before building.
+
+- Record the required features, dimensions, counts, spatial relationships,
+  body/part expectations, and output formats. Distinguish explicit requirements
+  from assumptions.
+- For an edit, additionally identify the precise target, expected change, and
+  geometry that must remain unchanged. A successful edit must satisfy both the
+  requested delta and the preservation requirements.
+- Write the acceptance checklist in working notes or `requirements.md` so it
+  remains visible while building. Give every item a planned measurement,
+  structural check, comparison, or visual review; do not rely on memory alone.
+- If the prompt names measurable holes, bores, or cylindrical bosses, write
+  them into `spec.json` before building:
+  ```json
+  {"features":[{"name":"bolt_holes","type":"cylinder","diameter_mm":6,"count":4}]}
+  ```
+- Declare structural intent when known, for example with
+  `show_object(part, options={"expect_solids": 1})`. Use named parts and
+  `floating: true` when separated bodies are intentional.
+
+Specification is complete when the result could be judged without relying on
+the same reasoning that constructs it. When a requirement cannot be checked
+automatically, state the visual or geometric evidence you will use.
+
+### 3. Build
+
+Create the simplest geometry that can satisfy the specification. For edits,
+prefer the smallest operation that changes the target without touching
+unrelated geometry.
+
+To separate generated artifacts from source, set `build_dir = "./build"` in
+`agentcad.toml` before `agentcad init`. Use `--build-dir PATH` for one command;
+it selects independent history and does not edit configuration. Relative build
+paths resolve from the project root, including from nested directories.
+`agentcad context` reports the resolved build root. Use returned artifact paths;
+`--label` names a version and deprecated `--output` is only a label alias.
+See `agentcad docs artifacts` for initialization, overrides, and recovery.
+
+Scripts should not export STEP themselves. Expose the intended geometry with
+`show_object(result)`; AgentCAD writes the canonical STEP file. Read its path
+from `outputs.step` in the run JSON (typically `vN_label/output.step`). A dry run
+does not write STEP and returns `outputs.step: null`. Do not call `save_step`,
+`write_step`, `export_step`, or guessed writer methods in generated scripts.
+Validation rejects recognizable manual STEP writer calls before script execution,
+including imported aliases and generic exporters with an explicit STEP destination.
+Remove those calls even if they work in standalone Python; only `outputs.step`
+identifies the tracked deliverable.
+
+**Write a script.** No imports needed — build123d primitives,
+   `show_object`, and agentcad edit helpers are pre-injected by default.
+   `show_object(result)` is required.
+
+**Dry-run first** to check metrics without consuming a version:
+   ```bash
+   agentcad run script.py --label test --dry-run
+   ```
+   Check `volume`, `dimensions`, `is_valid` in the response. `is_valid` is the
+   deliverable verdict: the kernel check, every shell closed, and a manifold
+   mesh. Do not hand a part off until it is `true`; `false` names the failing
+   layer in `validation.first_failure`, `null` means a check timed out
+   (`validation.timed_out_layer`; raise `AGENTCAD_VALIDATION_TIMEOUT_S`).
+
+**Run for real.** Visual feedback is on by default:
+   ```bash
+   agentcad run script.py --label label
+   ```
+   A normal successful iteration can produce (paths in the JSON response):
+   - `preview.png` — balanced top, bottom, upper-iso, and lower-iso composite.
+     **Read this** to confirm the part looks right before iterating. The lower
+     views expose geometry that a top view can hide.
+   - `diff.side_by_side` — side-by-side PNG vs the most recent successful prior
+     version, when one exists and automatic diff is enabled. **Read this** when
+     iterating to see what your change did.
+   - `diff.overlay` — centered 2D visual-overlap map (coincident gray,
+     reference-only blue, candidate-only orange). It helps locate silhouette
+     changes but does not prove physical correctness or shared 3D volume.
+   - `viewer.html` — interactive 3D review viewer for the user unless viewer
+     artifacts are disabled (humans only;
+     you can't render HTML). It remains an immutable version snapshot.
+     `project_viewer.url` is the live project URL: share it with the human and
+     leave its tab open while iterating. Successful builds update that page
+     automatically, preserving the camera and compatible review settings.
+     From v2, A=previous and B=current are already loaded with synchronized
+     A/B, side-by-side, overlay, diff-image, and Parts-tab change review.
+
+   Pass `--no-preview` only for tight parametric sweeps where latency matters.
+   Pass `--no-view` only when browser launch would disrupt an unattended or
+   high-volume run.
+
+   For a core-only iteration, pass
+   `--no-preview --no-diff --no-view`. This writes `output.step`, the saved
+   script, `meta.json` (including metrics), and explicitly requested exports
+   without generating previews, automatic comparisons, viewer assets, or
+   opening a browser. You can still run an explicit
+   `agentcad diff OLD NEW` later.
+
+### 4. Validate
+
+Prove that the geometry satisfies the request and that the written artifact is
+structurally deliverable. A successful command or plausible preview is not
+enough.
+
+- Read `preview.png`; the lower views can expose geometry hidden from the top.
+- For edits, read `diff.side_by_side` and `diff.overlay`, then use the numeric
+  comparison to confirm the intended region changed and unrelated geometry
+  stayed stable. An unchanged output is not a successful edit. In
+  `changes.outputs`, however, `unchanged` means an artifact category exists in
+  both versions; it does not mean the STEP bytes or geometry are identical.
+  Use metric deltas and `comparison_3d` to judge the geometry.
+- Use measurements and explicit feature checks below to compare the result to
+  the specification.
+- Read top-level `metrics.is_valid`, not only a successful command status.
+
+   When a comparison is slow or incomplete, read `comparison_phases` in the
+   JSON response. `source_loading`, `comparison_rendering`,
+   `projection_comparison`, `exact_3d_comparison`,
+   `approximate_3d_comparison`, `difference_artifact_export`, and
+   `viewer_generation` each report a status
+   and, when attempted, `duration_ms`. The largest duration identifies the
+   expensive stage; a failed exact phase does not erase a successful projection.
+   Exact 3D work has a 30-second default worker budget. Set
+   `AGENTCAD_DIFF_TIMEOUT_S=N` to override it (`0` disables the dedicated limit
+   for diagnostics). A timeout leaves the core version and projection usable,
+   then runs a bounded voxel fallback. Approximate results report
+   `method=approximate_voxel_volume`, `resolution_mm`, and a non-strict
+   `error_estimate`; its `absolute_volume` values are heuristic errors, not
+   measurements. `exact_attempt` retains the exact failure. Use
+   `AGENTCAD_APPROX_DIFF_TIMEOUT_S` and `AGENTCAD_APPROX_RESOLUTION_MM` to tune
+   the fallback. If exact volumes are still needed, run
+   `agentcad diff OLD NEW` with a larger budget; do not rerun the original CAD
+   command and create a duplicate version.
+
+   Daemon-routed commands may run beyond 30 seconds. Progress heartbeats appear
+   on stderr while stdout stays reserved for the final JSON response, and the
+   submitted command is never automatically retried. If a silent or lost daemon
+   returns `outcome: "unknown"` and `retry_safe: false`, inspect `agentcad
+   context`, existing outputs, and `agentcad daemon status` before retrying; the
+   original command may already have completed.
+
+**Review with the user.** The live project viewer opens automatically and
+   reuses an active tab. Share `project_viewer.url` for ongoing iteration;
+   share `viewer` for a fixed version. Use `agentcad viewer open` to reopen the
+   project, and `agentcad viewer status` or `stop` for service diagnostics. On v2+
+   start with its previous/current comparison, then use A/B, Overlay, and Parts
+   without selecting files manually. Use `agentcad view old.step new.step` only
+   for an explicit non-adjacent comparison.
+
+**Read the validation report if invalid.** A `status: invalid_geometry` run
+   already carries `validation`: the failing layer, free edges by ID with
+   endpoints, or the located mesh defect, plus a `suggestion`. If the script
+   loaded a file, `validation.inherited_from_input` says whether that input
+   already failed the same layer (repair the input, not the edit) or is
+   `false` because the run introduced the failure. For an existing
+   file:
+   ```bash
+   agentcad inspect v1_label/output.step
+   ```
+   Intentional surfaces or sheet bodies: pass `--validation-profile kernel`.
+   Use `agentcad view FILE --validation` or `agentcad render FILE --view iso
+   --highlight validation` to see the reported defects on an existing STEP.
+   Read `validation.guidance` for the finding, unknowns, and next checks.
+   `validation.repairs` contains unverified possibilities, not diagnosed fixes.
+   Check each precondition; `changes_intent: false` is not a safety verdict.
+   Never fuse or delete bodies just to clear a check.
+   Declare `show_object(part, options={"expect_solids": 1})` when one body is
+   required. Read disconnected-part warnings; `options={"floating": True}`
+   marks deliberate separation. Revalidate after any repair.
+   For exported meshes, check `mesh_validation.<format>.is_valid` before
+   handing off that file. Export success means it was written, not that it
+   passed. A mesh timeout/error is unknown; the CAD verdict does not certify
+   the mesh. `validation.step_round_trip` compares source/STEP layer outcomes
+   and solid counts, not shape fidelity or printability; on large parts
+   `skipped_layers` names checks run only on the reloaded STEP.
+
+**Measure feature sizes.** For dimensions beyond top-level metrics:
+   ```bash
+   agentcad measure v1_label/output.step
+   ```
+   Use this for hole diameters, cylindrical boss diameters, edge lengths,
+   face areas, and full per-feature measurements with `--features`.
+
+**Check explicit feature requirements.** If the prompt names measurable
+   holes, bores, or cylindrical bosses, write them into `spec.json` before
+   final handoff:
+   ```json
+   {"features":[{"name":"bolt_holes","type":"cylinder","diameter_mm":6,"count":4}]}
+   ```
+   Then run:
+   ```bash
+   agentcad check-spec v1_label/output.step spec.json
+   ```
+   Revise the CAD if `passed` is false. `status: success` only means the
+   comparison ran; `passed` is the actual spec-check result. If you include
+   `axis`, copy it from `agentcad measure`'s `cylindrical_features[].axis`.
+
+If any intent or artifact check fails, revise the specification when an
+assumption was wrong; otherwise revise the script. Build a new candidate and
+repeat validation. Use `agentcad diff 1 2` to compare versions.
+
+### 5. Deliver
+
+Deliver only the exact artifact that passed validation. Use the path returned
+in `outputs.step`; `--label` and deprecated `--output` values are not paths.
+
+Before handoff, confirm:
+
+- required measurements and feature checks pass;
+- edit differences are intentional and localized when a source model exists;
+- top-level `metrics.is_valid` is `true` under the intended profile;
+- `validation.step_round_trip` has been reviewed for disagreements; and
+- every requested mesh has its own `mesh_validation.<format>.is_valid: true`.
+
+Export success only means a file was written. The STEP verdict does not certify
+STL, GLB, or OBJ bytes.
+
+## Script writing rules
+
+- `show_object(result)` is required — at least one call.
+- The same `show_object(result)` call accepts a build123d `Part`, `Compound`,
+  or raw OCP `TopoDS_Shape`; no manual conversion or STEP writer is needed.
+- These are pre-injected by default (no import needed):
+  build123d primitives like `Box`, `Cylinder`, `Sphere`, `Plane`, plus
+  `show_object`, `load_step`, `pick_face`, `pick_edge`, `fillet_edges`,
+  `chamfer_edges`, `shell_faces`, `cut_pocket`, `boss`, `split_by_plane`,
+  `copy_shape`, `safe_cut`, `safe_intersection`, `safe_fuse`,
+  `translate`, `rotate`, `bbox_point`, `bbox_size`, `place_at`, `annular_boss`, and
+  `raise_annulus`.
+- For explicit imports and editor completion, import those same AgentCAD
+  callables from the stable namespace:
+  ```python
+  from agentcad.api import load_step, safe_cut, translate, show_object
+  ```
+  Import primitives and types such as `Box` and `Vector` from `build123d`.
+- Python math names are not pre-injected. Import the ones the script uses,
+  for example `from math import cos, sin, sqrt, pi`.
+- Primitive `align=` anchors bounding-box sides at the origin; it is not a
+  position. Use `Align.MIN`, `Align.CENTER`, `Align.MAX`, or `Align.NONE`
+  (preserve native coordinates), either once or per axis. Equivalent
+  case-insensitive strings are accepted:
+  ```python
+  centered = Box(10, 20, 5, align=Align.CENTER)
+  corner = Box(10, 20, 5, align=(Align.MIN, Align.MIN, Align.MIN))
+  mixed = Box(10, 20, 5, align=("min", "center", "max"))
+  with BuildPart("XY") as part:
+      Box(10, 20, 5)
+  ```
+  A numeric tuple is a position, so move after construction instead:
+  `Box(10, 20, 5).translate((10, 0, 5))`. Builder contexts accept `Plane.XY`
+  or plane-name shortcuts such as `"XY"`.
+- The runtime-neutral placement helpers accept either new build123d shapes or
+  raw imported topology and return an independent raw shape:
+  ```python
+  moved = translate(shape, 10, 0, 5)
+  turned = rotate(shape, "Y", 90)
+  seated = place_at(shape,
+      from_pt=bbox_point(shape, "center", "center", "min"),
+      to_pt=(10, 0, 5))
+  ```
+- Query bounds on a Part or raw TopoDS shape with pre-injected helpers
+  (also available from `agentcad.api`). Each returns an X/Y/Z tuple in model units:
+  ```python
+  xmin, ymin, zmin = bbox_point(shape, 'min', 'min', 'min')
+  xc, yc, zc = bbox_point(shape)  # bounding-box center
+  xmax, ymax, zmax = bbox_point(shape, 'max', 'max', 'max')
+  xlen, ylen, zlen = bbox_size(shape)  # max minus min
+  top_center = bbox_point(shape, x='center', y='center', z='max')
+  ```
+  For native build123d bounds, use `bbox.min.X`, `bbox.center().X`,
+  `bbox.max.X`, and `bbox.size.X` (likewise Y/Z). Vector coordinates are
+  uppercase; `bbox.xmin`, `bbox.lower_z`, and `vector.x` are unsupported.
+- For imported STEP/BREP edits, `load_step(path)` returns a build123d `Part`:
+  ```python
+  base = load_step("v1_vendor/output.step")
+  solids = base.solids()
+  faces = base.faces()
+  edges = base.edges()
+  bounds = base.bounding_box()
+  ```
+  Use `agentcad measure` and `agentcad inspect` for read-only discovery; use
+  the loaded `Part` in a script when changing geometry. See
+  `agentcad docs editing` for the complete edit workflow.
+- The edit helpers keep your object model. `translate`, `rotate`, `place_at`,
+  `copy_shape`, `mirror_fuse`, `safe_cut`, `safe_intersection`, `safe_fuse`,
+  and `raise_annulus` return the same kind of shape they were given: a
+  build123d `Part` in gives a build123d `Part` out, so `.faces()`, `+`, `-`,
+  `.fillet()`, and `show_object()` keep working afterwards. A raw
+  `TopoDS_Shape` in gives a raw shape out (no `.wrapped`, not iterable);
+  `load_step_shape(path)` is the explicit raw escape hatch. Do not wrap a raw
+  solid in `Compound(raw)` or `Part(raw)` — that wrapper reports zero volume
+  and iterates over shells. `show_object()`, `show_assembly()`, and
+  `assemble()` accept raw and wrapped shapes directly; the ID-based
+  `fillet_edges` / `cut_pocket` family accepts both and returns build123d
+  shapes.
+- When repeating an imported feature, use the pre-injected `rotate()` or
+  `translate()` helper. These helpers make an independent geometry copy
+  before moving it, preventing shared topology from corrupting later Boolean
+  results:
+  ```python
+  blade = load_step("blade.step")       # build123d Part
+  blade_72 = rotate(blade, "Z", 72)     # still a Part
+  ```
+  Use `copy_shape(blade)` when an independent, untransformed copy is needed.
+- For imported geometry Booleans, use `safe_cut(source, *tools)`,
+  `safe_intersection(left, right)`, and `safe_fuse(source, *tools)`. They copy
+  every input, run all tools together, validate the output, and reject
+  physically impossible volume changes instead of returning them silently:
+  ```python
+  base = load_step("v1_vendor/output.step")
+  trimmed = safe_cut(base, Cylinder(radius=5, height=40))   # Part in, Part out
+  show_object(trimmed)
+  ```
+- For imported STEP annular edits, use the non-fuse workflow:
+  ```python
+  base = load_step("v1_vendor/output.step")
+  result = raise_annulus(base, center=(0, 0), inner_diameter=40,
+                         outer_diameter=80, height=7, z=5)
+  show_object(result)   # Part holding two solids: base + land, not fused
+  ```
+- For OCP internals (`gp_Pnt`, `BRepPrimAPI`, etc.), import manually.
+- CadQuery compatibility remains available for existing projects. See
+  `agentcad docs runtimes` for that separate workflow.
+
+## Key commands
+
+### Setup and recovery
+
+| Command | Purpose |
+|---------|---------|
+| `agentcad init --name NAME` | Initialize project |
+| `agentcad context` | Inspect project state and interrupted-version recovery candidates |
+| `agentcad recover VERSION_DIR` | Validate and reconcile interrupted history without deleting files |
+| `agentcad docs [SECTION]` | Read runtime-aware built-in documentation |
+| `agentcad instructions install` | Refresh this guide in AGENTS.md/CLAUDE.md |
+
+### Inspect
+
+| Command | Purpose |
+|---------|---------|
+| `agentcad inspect STEP` | Bounded topology, orientation, IDs, risk, and validation evidence |
+| `agentcad measure STEP` | Overall dimensions and feature sizes |
+| `agentcad render STEP --view SPEC` | Render orientation and feature evidence |
+| `agentcad parts list REF` | List captured parts and stable part identities |
+| `agentcad parts show REF ID` | Isolate one versioned part |
+
+### Specify
+
+| Command | Purpose |
+|---------|---------|
+| `agentcad check-spec STEP spec.json` | Evaluate explicit cylindrical-feature and structure requirements |
+
+Write the specification before building; run `check-spec` during Validate.
+
+### Build
+
+| Command | Purpose |
+|---------|---------|
+| `agentcad run SCRIPT --label LABEL` | Execute script, produce STEP + metrics |
+| `agentcad run ... --dry-run` | Metrics only, no version consumed; `--label` optional |
+| `agentcad run ... --no-preview` | Suppress preview (on by default) |
+| `agentcad run ... --no-diff` | Suppress automatic prior-version comparison |
+| `agentcad run ... --no-view` | Suppress automatic browser review |
+| `agentcad run ... --render iso,front` | PNG views |
+| `agentcad run ... --export stl,glb` | Mesh export |
+| `agentcad run ... --params k=v,k=v` | Override script parameters |
+
+### Validate
+
+| Command | Purpose |
+|---------|---------|
+| `agentcad diff REF1 REF2` | Compare intended and unintended geometric changes |
+| `agentcad check-spec STEP spec.json` | Check measured features against the specification |
+| `agentcad inspect STEP` | Confirm structural deliverability and locate failures |
+| `agentcad measure STEP` | Confirm required dimensions and feature sizes |
+| `agentcad view FILE [FILE_B]` | Review one model or an explicit synchronized A/B comparison |
+
+### Deliver
+
+| Command | Purpose |
+|---------|---------|
+| `agentcad export STEP --format stl,glb` | Post-hoc mesh export |
+| `agentcad viewer open` | Open the live project review artifact |
+
+`--label` names a version; read the generated file from `outputs.step`.
+`--output` remains a deprecated compatibility alias and is not a path option.
+
+## Debugging playbook
+
+1. **Check metrics first** — `volume` and `dimensions` catch most issues.
+2. **Read `preview.png`** — the 4-view composite. Fastest way to spot obvious problems.
+3. **Read `diff.side_by_side`** if iterating — confirms your change did what you intended.
+4. **Negative volume?** Wire winding is backwards (CW instead of CCW).
+5. **Need a hole diameter or edge length?** Run `agentcad measure output.step`.
+6. **Need to verify explicit hole/bore counts?** Write `spec.json`, then run
+   `agentcad check-spec output.step spec.json`.
+7. **is_valid: false?** Read `validation.first_failure` and its layer entry:
+   `shell_closure` lists the free edges with endpoints, `mesh_manifold` locates
+   the defect and names the faces, `brep_check` lists kernel error classes.
+8. **Open shell?** `validation.layers.shell_closure.free_edges` traces the gap;
+   close the profile or add the missing face. `metrics.reliable: false` means the
+   volume is not physical.
+9. **Complex profiles (gears, splines)?** Use subtractive construction — cut from
+   a blank cylinder/box instead of building up. See `agentcad docs patterns`.
+10. **A run failed?** Trust `artifact_created: false` and `outputs.step: null`;
+    fix the script and execute the returned `next_actions` command. Do not write
+    or truncate STEP text — `agentcad run` or `agentcad import` must create it
+    through the CAD kernel.
+11. **Large inspect timed out?** It is not automatically malformed. Execute the
+    returned `--validate-only` action for a structural check, or the larger-budget
+    deep retry. Configure the default with `AGENTCAD_INSPECT_TIMEOUT_S`.
+
+## Patterns
+
+- **Build at origin, then position:** Create geometry at origin, use `translate()`
+  and `rotate()` to place it. These helpers copy imported topology before
+  transforming it and hand back the same kind of shape they were given.
+- **Compound vs fuse:** `Compound([...])` keeps assembly parts separate. Use
+  `safe_fuse(source, *tools)` when imported solids must become one union; use
+  build123d's `+` operator for ordinary newly constructed geometry.
+- **Parametric scripts:** Top-level variable assignments become overridable via
+  `--params`. Use this for iteration.
+- **Named parts:** `show_object(shape, id="wheel_left", name="Left wheel",
+  options={"color": "red"})` for stable part handles, per-part metrics, and
+  colored GLB export.

@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "name": "agentcad",
+  "version": "0.1.0",
+  "description": "Build, validate, and export production-grade CAD parts and assemblies with AgentCAD (build123d or CadQuery)",
+  "core": { "file": "core.md", "budget_tokens": 7000 },
+  "chunks": {
+    "cadquery": {
+      "file": "chunks/cadquery.md",
+      "summary": "CadQuery compatibility variant of the AgentCAD operating guide: runtime='cadquery', cq import, CadQuery API substitutions, cadquery runtime fingerprint",
+      "triggers": ["cadquery", "CadQuery", "cq import", "runtime='cadquery'", "457f839450fe"]
+    }
+  },
+  "requires": { "be_code": ">=1.3.0" }
+}
