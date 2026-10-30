@@ -27,6 +27,7 @@ code somebody else wrote into your agent's process.
 | [`packs/assist`](packs/assist) | A personal assistant over the state of the work: git, task documents, the changelog. Facts come from a scan script; judgement comes from core's rules, whose spine is withholding | 0.1.0 — seed. Switched on by hand, never detected. No test state, no outward action; phase 2 (mail, calendar) waits on pack-declared MCP servers |
 | [`packs/reverse-engineer`](packs/reverse-engineer) | Reverse engineering a binary or app the model has no prior knowledge of: connect to the REA MCP server, route by target, native artifacts via Hopper/Ghidra, JavaScript source recovery via Wakaru, Android via JADX, and runtime observation. Evidence-first, every claim a ref or a quote | 0.1.0 — ported from the REA toolkit. Six chunks, all read-only; the capability lives in the external REA server, so there are no verify commands or parsers. No `detect` — switched on by hand, never auto-activated |
 | [`packs/agentcad`](packs/agentcad) | Building, validating, and exporting production-grade CAD parts and assemblies in Python from a natural-language brief, in build123d (default) or CadQuery. The operating guide is the product: canonical workflow, tool catalog, API cheat-sheet, patterns, verification gates | 0.1.0 — ported from the AgentCAD `skill` command. Two complete, byte-identical runtime guides (build123d core + CadQuery chunk); the capability lives in the external AgentCAD server, so there are no verify commands or parsers. No `detect` — switched on by hand, never auto-activated |
+| [`packs/bash`](packs/bash) | Shell command discipline: quoting and expansion, pipelines and exit codes, portable text processing, `find`/`xargs`, process control, portability across shells and platforms, non-interactive flags, and script writing. Failure playbook keyed on condensed stderr | 0.1.0 — ported from the `be-bash-pack-handoff` bundle. Core plus eight on-demand chunks, five commands, an error playbook, and a script template. The bundle's `pre_exec` lint hook and `jsonl-diag` verify parser are not 1.3.0 loader features, so linting is a manual `preflight` command and no `verify[]` entry ships |
 | [`packs/ue5`](packs/ue5) | Unreal Engine 5 C++: reflection and UHT, modules and `.Build.cs`, object lifetime, replication, building with UnrealBuildTool, and 15 playbook entries for the errors that stop a build | 0.1.0 — seed. Two chunks of a planned nine; never yet run against a real engine |
 | [`packs/ui-web`](packs/ui-web) | React + TypeScript interfaces: accessibility ordered by measured real-world frequency, state, effects, types. Eight playbook entries, every one written from captured toolchain output rather than from a rule's documentation | 0.1.0 — seed. Six chunks; contrast, empty buttons and unlabelled inputs are rules rather than checks, because no standard lint config catches them |
 
@@ -123,9 +124,12 @@ been tested with `--dry-run` against a fake engine tree but not against a real
 Unreal install. The assist pack has been run end to end against a real local
 model. The reverse-engineer and agentcad packs are ports that depend on an
 external MCP server and have no verify commands, so "tested" for them means
-byte-identical to their source, not a build they have driven. Each pack's own
-README says what it does not do, and `docs/ledgers/` records where the plans
-turned out to be wrong.
+byte-identical to their source, not a build they have driven. The bash pack is
+a port from the `be-bash-pack-handoff` bundle; its pre-execution linting needs
+the optional `shlint` binary (built by you, not shipped), and the two hook and
+parser features the bundle used were adapted to what the 1.3.0 loader supports
+rather than dropped. Each pack's own README says what it does not do, and
+`docs/ledgers/` records where the plans turned out to be wrong.
 
 Contributions welcome, particularly real toolchain output: a few hundred lines
 of a genuinely failing build is worth more to a playbook than any amount of

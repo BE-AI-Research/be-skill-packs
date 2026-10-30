@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "name": "bash",
+  "version": "0.1.0",
+  "description": "Shell command discipline: quoting, pipes, text tools, find, process control, portability, non-interactive flags, and script-writing rules.",
+  "core": { "file": "core.md", "budget_tokens": 1200 },
+  "chunks": {
+    "quoting": {
+      "file": "chunks/quoting.md",
+      "summary": "Quoting and expansion: word splitting, globbing, $var vs \"$var\" vs ${var:?}, arrays, $(...) and heredocs",
+      "triggers": ["$", "\"$", "${", "$(", "<<", "IFS", "array", "glob"]
+    },
+    "pipes": {
+      "file": "chunks/pipes.md",
+      "summary": "Pipes, redirection, exit codes, pipefail, &&/||/;, subshells, process substitution, tee, here-strings",
+      "triggers": ["|", "2>&1", ">>", "pipefail", "exit code", "$?", "tee", "<(", "subshell"]
+    },
+    "text": {
+      "file": "chunks/text.md",
+      "summary": "Text processing: grep/rg, sed, awk, cut, sort, uniq, tr, jq, column; portable idioms and traps",
+      "triggers": ["grep", "sed", "awk", "cut", "sort", "uniq", "jq", "tr ", "rg "]
+    },
+    "find": {
+      "file": "chunks/find.md",
+      "summary": "find and xargs: -print0/-0, -exec vs xargs, pruning, size/time filters, parallel -P, fd/rg alternatives",
+      "triggers": ["find ", "xargs", "-exec", "-print0", "-name", "-mtime", "fd "]
+    },
+    "process": {
+      "file": "chunks/process.md",
+      "summary": "Process control: timeout, background jobs, wait, traps, signals, nohup, exit codes by convention, PID files",
+      "triggers": ["timeout", "nohup", "&", "wait", "trap", "kill", "pgrep", "background"]
+    },
+    "portability": {
+      "file": "chunks/portability.md",
+      "summary": "bash vs sh vs zsh, GNU vs BSD vs busybox (sed -i, date, readlink, xargs), WSL and the PowerShell/cmd boundary",
+      "triggers": ["sed -i", "macOS", "BSD", "busybox", "Alpine", "WSL", "PowerShell", "pwsh", "cmd.exe", "#!/bin/sh"]
+    },
+    "noninteractive": {
+      "file": "chunks/noninteractive.md",
+      "summary": "Running without a human: every tool that prompts or pages and its non-interactive flag; detecting a hang; timeouts",
+      "triggers": ["--no-pager", "-y", "BatchMode", "prompt", "hang", "tty", "DEBIAN_FRONTEND", "yes |"]
+    },
+    "scripts": {
+      "file": "chunks/scripts.md",
+      "summary": "Writing scripts: shebang, set -euo pipefail, functions, argument parsing, usage, temp files, logging, idempotence",
+      "triggers": ["#!/", "set -e", "getopts", "mktemp", "function", "usage()", ".sh"]
+    }
+  },
+  "requires": { "be_code": ">=1.3.0" }
+}
