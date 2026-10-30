@@ -1,0 +1,17 @@
+This session's shell is PowerShell. It is not bash with different spelling: the pipeline carries objects, errors do not stop anything by default, and many cmdlets prompt.
+
+**Nothing may wait for a human.** `-Confirm:$false` on anything that changes state; `-Force` on `Install-Module`, `Set-ExecutionPolicy`, `New-Item`, `Remove-Item`; never `Read-Host`, `Get-Credential`, `Out-GridView`, `Pause`, `-Verb RunAs`; `winget install ... --silent --accept-package-agreements --accept-source-agreements`; `choco install -y`; `git --no-pager`; `ssh -o BatchMode=yes`. `Remove-Item` on a non-empty folder prompts unless `-Recurse`. Bound waits: `Wait-Job -Timeout`, `Start-Process -Wait` only with `-PassThru` and a known-terminating program, `Get-Content -Tail` never `-Wait`.
+
+**Make errors stop you.** Cmdlet errors are non-terminating: the red text appears and the pipeline continues. Begin a tool call with `$ErrorActionPreference = 'Stop';` or add `-ErrorAction Stop` to the cmdlets that matter. Native programs (`git`, `dotnet`, `curl.exe`) set `$LASTEXITCODE`, not `$?`; check it. `;` always continues; `&&`/`||` work only on PowerShell 7+. Write `if (-not $?) { throw }` when the target may be Windows PowerShell 5.1.
+
+**Objects, then text, in that order.** Filter and shape with `Where-Object`, `Select-Object`, `Sort-Object`; convert to text only at the end (`Format-Table`, `Out-String`, `ConvertTo-Json -Depth 5`). Never parse `Format-*` output. `Select-Object -First N` bounds output; a tool result over a few hundred lines wastes the next step's context.
+
+**Paths**: `Join-Path`, `Test-Path`, `-LiteralPath` for names with `[ ]` or wildcards, `$PSScriptRoot` for script-relative. No `~`, no `/dev/null` (`$null`), no `$var/sub` (`"$var\sub"` or `Join-Path`). Unix tools (`grep`, `awk`, `sed`, `ls -la`, `rm -rf`, `chmod`) do not exist here; `curl` and `wget` are aliases for `Invoke-WebRequest` on Windows PowerShell 5.1 (use `curl.exe`). If you must run bash: `wsl bash -c '...'` or `bash -c '...'` explicitly.
+
+**Destructive commands are declared, listed, and gated.** `Remove-Item -Recurse`, `Clear-Content`, `Stop-Service`/`Restart-Service`, `Stop-Process`, `Restart-Computer`, any `Remove-AD*`/`Disable-AD*`/`Set-ADAccountPassword`, `Remove-VM*`, registry deletes, firewall/adapter changes, `Format-Volume`, `git reset --hard`: run `-WhatIf` first in the same call, name the exact object (full path, DistinguishedName, service name), state what is destroyed and why, and expect the approval gate. Never recurse-delete a drive root, `$HOME`, `$env:SystemRoot`, a bare `*`, or an unchecked `$var`. Never `iex (iwr ...)`.
+
+**Read before you write.** `Get-ChildItem`/`Get-Item`/`Get-Content -First` the thing you are about to change. `Get-Command name` before relying on a tool. Check `$PSVersionTable.PSVersion` once when it matters (5.1 vs 7). Working directory and variables may not persist between tool calls; chain in one call or use absolute paths.
+
+**Scripts**: `#Requires`, `[CmdletBinding(SupportsShouldProcess)]`, `param()` with types, `Set-StrictMode -Version Latest`, `$ErrorActionPreference = 'Stop'`, `try/catch` around the risky part, `Write-Verbose` not `Write-Host` for progress. `ps-script-lint` runs the parser and PSScriptAnalyzer; fix the first finding, do not suppress rules to pass.
+
+**When a command fails**, read the first error line, match the playbook, change one thing. Three failures on the same signature: stop and report.

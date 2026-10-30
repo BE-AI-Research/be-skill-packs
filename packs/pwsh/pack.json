@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "name": "pwsh",
+  "version": "0.1.0",
+  "description": "PowerShell discipline for agents: objects not text, non-interactive cmdlets, and gating destructive commands (files, services, AD, Hyper-V, registry).",
+  "core": { "file": "core.md", "budget_tokens": 1200 },
+  "chunks": {
+    "translate": {
+      "file": "chunks/translate.md",
+      "summary": "bash to PowerShell translation table: files, text, env, processes, chaining, redirection, exit codes, native commands",
+      "triggers": ["grep", "sed", "awk", "ls -", "export ", "/dev/null", "&&", "chmod", "which", "curl -"]
+    },
+    "pipeline": {
+      "file": "chunks/pipeline.md",
+      "summary": "Objects in the pipeline: Select/Where/ForEach/Sort/Group/Measure, Format-* last, $_, calculated properties, ConvertTo-Json, errors (-ErrorAction, $?, $LASTEXITCODE, try/catch)",
+      "triggers": ["Select-Object", "Where-Object", "ForEach-Object", "$_", "Format-Table", "ConvertTo-Json", "-ErrorAction", "$LASTEXITCODE"]
+    },
+    "files": {
+      "file": "chunks/files.md",
+      "summary": "Files and paths: Get-ChildItem, Join-Path, Test-Path, -LiteralPath vs -Path, Get/Set-Content encoding, Copy/Move/Remove-Item, providers (Env:, HKLM:, Cert:)",
+      "triggers": ["Get-ChildItem", "Join-Path", "Test-Path", "Get-Content", "Set-Content", "-LiteralPath", "HKLM:", "Env:"]
+    },
+    "text": {
+      "file": "chunks/text.md",
+      "summary": "Text and data: Select-String, -match/-replace/-split, regex, here-strings, ConvertFrom-Json, Import/Export-Csv, Invoke-RestMethod",
+      "triggers": ["Select-String", "-match", "-replace", "-split", "ConvertFrom-Json", "Import-Csv", "Invoke-RestMethod", "@\""]
+    },
+    "process": {
+      "file": "chunks/process.md",
+      "summary": "Processes, services, jobs, remoting, scheduled tasks, event logs, timeouts (Start-Process -Wait -PassThru, Start-Job, Wait-Job -Timeout, Invoke-Command)",
+      "triggers": ["Start-Process", "Get-Service", "Start-Job", "Invoke-Command", "Get-WinEvent", "Register-ScheduledTask", "Wait-Process"]
+    },
+    "noninteractive": {
+      "file": "chunks/noninteractive.md",
+      "summary": "Everything that prompts in PowerShell and its non-interactive form: -Confirm:$false, -Force, Read-Host, Get-Credential, Install-Module, winget, UAC, execution policy",
+      "triggers": ["-Confirm", "-Force", "Read-Host", "Get-Credential", "Install-Module", "winget", "RunAs", "ExecutionPolicy"]
+    },
+    "scripts": {
+      "file": "chunks/scripts.md",
+      "summary": "Writing scripts and modules: param/CmdletBinding, ShouldProcess (-WhatIf), Set-StrictMode, $ErrorActionPreference, try/catch/finally, Write-Verbose, Pester, PSScriptAnalyzer",
+      "triggers": ["param(", "CmdletBinding", "ShouldProcess", "Set-StrictMode", "ErrorActionPreference", "Write-Verbose", "Pester", "PSScriptAnalyzer"]
+    },
+    "windows-admin": {
+      "file": "chunks/windows-admin.md",
+      "summary": "Windows Server admin safely: Active Directory, DNS, DHCP, GPO, Hyper-V, registry, firewall, features; -WhatIf first, identify by DN, back up before change, do not cut your own access",
+      "triggers": ["Get-ADUser", "New-ADUser", "Set-AD", "Remove-AD", "Get-GPO", "Hyper-V", "Get-VM", "DnsServer", "DhcpServer", "Install-WindowsFeature", "NetFirewall", "Get-ItemProperty HKLM"]
+    }
+  },
+  "requires": { "be_code": ">=1.3.0" }
+}

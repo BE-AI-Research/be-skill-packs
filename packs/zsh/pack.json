@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "name": "zsh",
+  "version": "0.1.0",
+  "description": "zsh shell discipline: globbing and qualifiers, options (setopt), 1-indexed arrays, startup-file order, and the differences from bash. Pair with the bash pack for the shared rules.",
+  "core": { "file": "core.md", "budget_tokens": 800 },
+  "chunks": {
+    "differences": {
+      "file": "chunks/differences.md",
+      "summary": "zsh vs bash: no word splitting, nomatch globs, 1-indexed arrays, parameter flags, bash-only constructs and their zsh forms",
+      "triggers": ["${(", "$=", "mapfile", "shopt", "declare -n", "BASH_", "KSH_ARRAYS", "emulate"]
+    },
+    "globbing": {
+      "file": "chunks/globbing.md",
+      "summary": "zsh globbing: ** recursion, qualifiers (.) (/) (N) (om) (m-7) (L+1), extended_glob ^ ~ #, and when to still use find",
+      "triggers": ["**/", "(N)", "(.)", "(om", "extended_glob", "null_glob", "glob qualifier"]
+    },
+    "options": {
+      "file": "chunks/options.md",
+      "summary": "setopt/unsetopt that change script behaviour: err_exit, pipe_fail, null_glob, no_unset, sh_word_split, ksh_arrays, and emulate -L",
+      "triggers": ["setopt", "unsetopt", "err_exit", "pipe_fail", "sh_word_split", "emulate -L"]
+    },
+    "config": {
+      "file": "chunks/config.md",
+      "summary": "zsh startup files and order (.zshenv .zprofile .zshrc .zlogin), what scripts do not load, macOS default shell notes, oh-my-zsh pitfalls for automation",
+      "triggers": [".zshrc", ".zshenv", "zprofile", "oh-my-zsh", "macOS", "Darwin", "login shell"]
+    }
+  },
+  "requires": { "be_code": ">=1.3.0" }
+}

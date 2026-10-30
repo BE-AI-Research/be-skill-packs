@@ -1,0 +1,7 @@
+#!/bin/sh
+# Locate the shlint checker. Build: go build -o ~/.be-code/bin/shlint ./tools/shlint
+for c in "${SHLINT:-}" "$HOME/.be-code/bin/shlint" "$(command -v shlint 2>/dev/null)"; do
+  [ -n "$c" ] && [ -x "$c" ] && exec "$c" "$@"
+done
+printf '{"file":"","code":"PACK-TOOLMISSING","severity":"error","message":"shlint not found: build tools/shlint and install to ~/.be-code/bin/shlint (or set SHLINT)","signature":"PACK-TOOLMISSING:shlint"}\n'
+exit 1
